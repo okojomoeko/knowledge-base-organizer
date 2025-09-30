@@ -1,0 +1,91 @@
+repos:
+  - repo: local
+    hooks:
+      - id: bandit
+        name: bandit
+        entry: bandit
+        language: python
+        types_or: [python, pyi, jupyter]
+        args: ["-c", "bandit.yaml", "-r", "src"]
+        stages: [pre-commit, manual]
+      - id: check-added-large-files
+        name: Check for added large files
+        entry: check-added-large-files
+        language: system
+        stages: [pre-commit, manual]
+      - id: check-toml
+        name: Check Toml
+        entry: check-toml
+        language: system
+        types: [toml]
+        stages: [pre-commit, manual]
+      - id: check-yaml
+        name: Check Yaml
+        entry: check-yaml
+        language: system
+        types: [yaml]
+        stages: [pre-commit, manual]
+      - id: end-of-file-fixer
+        name: Fix End of Files
+        entry: end-of-file-fixer
+        language: system
+        types: [text]
+        stages: [pre-commit, manual]
+      - id: isort
+        name: isort
+        entry: isort
+        require_serial: true
+        language: system
+        types_or: [cython, pyi, python]
+        args: ["--filter-files"]
+        stages: [pre-commit, manual]
+      - id: trailing-whitespace
+        name: Trim Trailing Whitespace
+        entry: trailing-whitespace-fixer
+        language: system
+        exclude_types: [markdown]
+        stages: [pre-commit, manual]
+      - id: ruff-lint
+        name: Ruff format and lint
+        entry: nox -s lint
+        language: python
+        types_or: [python, pyi, jupyter]
+        pass_filenames: false
+        stages: [pre-commit, manual]
+      # - id: ruff-check
+      #   name: ruff-check
+      #   entry: ruff check
+      #   language: python
+      #   types_or: [python, pyi, jupyter]
+      #   require_serial: true
+      #   args: [--fix]
+      #   stages: [pre-commit, manual]
+      # - id: ruff-format
+      #   name: ruff-format
+      #   entry: ruff format
+      #   language: python
+      #   types_or: [python, pyi, jupyter]
+      #   require_serial: true
+      #   args: []
+      #   stages: [pre-commit, manual]
+      - id: lizard
+        name: lizard
+        entry: nox -s lizard
+        language: system
+        types_or: [python, pyi, jupyter]
+        stages: [pre-commit, manual]
+        pass_filenames: false
+      - id: pip-audit
+        name: pip-audit
+        description: "Audits Python environments and dependency trees for known vulnerabilities"
+        entry: pip-audit
+        pass_filenames: false
+        language: python
+        stages: [pre-commit, manual]
+      - id: nox-pytest
+        name: Run Nox pytest for all Python versions
+        entry: nox -s pytest
+        language: python
+        types_or: [python, pyi, jupyter]
+        pass_filenames: false
+        stages: [pre-push, manual]

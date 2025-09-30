@@ -1,0 +1,15 @@
+[lint]
+select = ["F", "E", "W", "C901", "I", "N", "D", "UP", "ANN", "BLE", "FBT", "B", "PT", "PYI", "SIM", "ARG", "TD", "FIX", "PD", "PLC", "PLE", "PLR", "PLW", "NPY", "DOC", "RUF"]
+ignore = []
+
+[format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+
+[lint.pycodestyle]
+max-line-length = 120
+
+[lint.pydocstyle]
+convention = "google"

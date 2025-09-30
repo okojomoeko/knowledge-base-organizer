@@ -1,0 +1,13 @@
+{
+  "include": ["."],
+  "exclude": ["__pycache__", ".venv", ".git", "node_modules", ".nox", ".pytest_cache", ".ruff_cache", ".mypy_cache", ".pdm-build", "build", "docs"],
+  "reportMissingImports": false,
+  "reportMissingTypeStubs": false,
+  "typeCheckingMode": "strict",
+  "autoImportCompletions": false,
+  "inlayHints": {
+    "functionReturnTypes": true,
+    "variableTypes": true,
+    "pytestParameters": true
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "files.exclude": {
+    "**/.nox": true,
+    "**/.venv": true
+  },
+  "files.watcherExclude": {
+    "**/.nox": true,
+    "**/.venv": true
+  },
+  "search.exclude": {
+    "**/.nox": true,
+    "**/.venv": true
+  },
+  "ruff.lint.enable": true,
+  "ruff.configuration": "ruff.toml",
+  "ruff.importStrategy": "fromEnvironment",
+  "[python]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit",
+      "source.organizeImports": "explicit"
+    },
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "editor.rulers": [80, 120]
+  },
+  "editor.defaultFormatter": "charliermarsh.ruff",
+  "python.defaultInterpreterPath": ".venv/bin/python",
+}
