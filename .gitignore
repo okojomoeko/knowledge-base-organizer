@@ -173,3 +173,8 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 .qodo
+
+myvault_backups/
+myvault
+
+.DS_Store
