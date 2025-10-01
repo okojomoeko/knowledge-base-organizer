@@ -73,10 +73,10 @@ def validate_frontmatter(
                 f"[blue]ℹ[/blue] Files with ID: {analysis_result['files_with_id']}"
             )
 
-        except Exception as e:
+        except (ValueError, FileNotFoundError) as e:
             progress.update(task, description="Analysis failed!")
             console.print(f"[red]✗[/red] Error: {e}")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from e
 
     console.print("[green]✓[/green] Vault analysis completed")
 

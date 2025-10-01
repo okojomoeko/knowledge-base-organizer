@@ -34,7 +34,7 @@ class FileRepository:
                     try:
                         markdown_file = self.load_file(file_path)
                         files.append(markdown_file)
-                    except Exception as e:
+                    except (ValueError, yaml.YAMLError, ValidationError) as e:
                         # Log error and continue with other files
                         print(f"Warning: Failed to load {file_path}: {e}")
                         continue
@@ -84,11 +84,10 @@ class FileRepository:
         relative_path = file_path.relative_to(vault_path)
         relative_str = str(relative_path)
 
-        for exclude_pattern in self.config.exclude_patterns:
-            if Path(relative_str).match(exclude_pattern):
-                return False
-
-        return True
+        return all(
+            not Path(relative_str).match(exclude_pattern)
+            for exclude_pattern in self.config.exclude_patterns
+        )
 
     def _parse_frontmatter(self, content: str) -> tuple[Frontmatter, str]:
         """Parse frontmatter from markdown content."""

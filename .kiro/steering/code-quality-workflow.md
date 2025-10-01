@@ -47,6 +47,7 @@ inclusion: always
 - [ ] pytest が成功する
 - [ ] カバレッジ要件を満たしている
 - [ ] 重要な型アノテーションが追加されている
+- [ ] `uv run pre-commit run`が全てpassしている
 
 ### 品質基準
 
