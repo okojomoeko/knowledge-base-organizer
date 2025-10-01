@@ -3,6 +3,7 @@
 import re
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import yaml
 from pydantic import ValidationError
@@ -56,12 +57,17 @@ class FileRepository:
         elif file_path.stem.isdigit() and len(file_path.stem) == OBSIDIAN_ID_LENGTH:
             file_id = file_path.stem
 
-        return MarkdownFile(
+        markdown_file = MarkdownFile(
             path=file_path,
             file_id=file_id,
             frontmatter=frontmatter,
             content=body_content,
         )
+
+        # Extract links from content
+        markdown_file.extract_links()
+
+        return markdown_file
 
     def save_file(self, file: MarkdownFile, backup: bool = True) -> None:
         """Save file with optional backup creation."""
@@ -90,25 +96,88 @@ class FileRepository:
         )
 
     def _parse_frontmatter(self, content: str) -> tuple[Frontmatter, str]:
-        """Parse frontmatter from markdown content."""
-        frontmatter_pattern = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
+        """Parse frontmatter from markdown content with enhanced error handling."""
+        # Support both --- and +++ delimiters
+        frontmatter_pattern = re.compile(
+            r"^(---|\+\+\+)\s*\n(.*?)\n(---|\+\+\+)\s*\n", re.DOTALL
+        )
         match = frontmatter_pattern.match(content)
 
         if match:
-            frontmatter_text = match.group(1)
+            frontmatter_text = match.group(2)
             body_content = content[match.end() :]
 
             try:
                 frontmatter_data = yaml.safe_load(frontmatter_text) or {}
+
+                # Handle common frontmatter field variations
+                frontmatter_data = self._normalize_frontmatter_fields(frontmatter_data)
+
                 frontmatter = Frontmatter(**frontmatter_data)
-            except (yaml.YAMLError, ValidationError):
-                # If frontmatter parsing fails, create empty frontmatter
+            except yaml.YAMLError as e:
+                # Log YAML parsing error but continue with empty frontmatter
+                print(f"Warning: YAML parsing error in frontmatter: {e}")
                 frontmatter = Frontmatter()
+            except ValidationError as e:
+                # Log validation error but continue with partial frontmatter
+                print(f"Warning: Frontmatter validation error: {e}")
+                # Try to create frontmatter with only valid fields
+                frontmatter = self._create_partial_frontmatter(frontmatter_data)
         else:
             frontmatter = Frontmatter()
             body_content = content
 
         return frontmatter, body_content
+
+    def _normalize_frontmatter_fields(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Normalize common frontmatter field variations."""
+        normalized = {}
+
+        for key, value in data.items():
+            # Normalize key names
+            normalized_key = key.lower().strip()
+
+            # Handle common field name variations
+            if normalized_key in ["tag", "category", "categories"]:
+                normalized_key = "tags"
+            elif normalized_key in ["alias", "aka"]:
+                normalized_key = "aliases"
+            elif normalized_key in ["created", "created_date", "creation_date"]:
+                normalized_key = "date"
+            elif normalized_key in ["published", "public"]:
+                normalized_key = "publish"
+            else:
+                normalized_key = key  # Keep original case for other fields
+
+            # Normalize values
+            if normalized_key in ["tags", "aliases"] and isinstance(value, str):
+                # Convert single string to list
+                normalized[normalized_key] = [value]
+            elif normalized_key == "publish" and isinstance(value, str):
+                # Convert string to boolean
+                normalized[normalized_key] = value.lower() in ["true", "yes", "1"]
+            else:
+                normalized[normalized_key] = value
+
+        return normalized
+
+    def _create_partial_frontmatter(self, data: dict[str, Any]) -> Frontmatter:
+        """Create frontmatter with only valid fields when validation fails."""
+        valid_fields = {}
+
+        # Try each field individually
+        for field in ["title", "aliases", "tags", "id", "date", "publish"]:
+            if field in data:
+                try:
+                    # Test if this field would be valid
+                    test_data = {field: data[field]}
+                    Frontmatter(**test_data)
+                    valid_fields[field] = data[field]
+                except ValidationError:
+                    # Skip invalid field
+                    continue
+
+        return Frontmatter(**valid_fields)
 
     def _reconstruct_content(self, file: MarkdownFile) -> str:
         """Reconstruct full content with frontmatter."""

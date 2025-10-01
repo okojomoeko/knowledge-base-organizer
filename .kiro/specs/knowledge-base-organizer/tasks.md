@@ -10,7 +10,7 @@
     - _Requirements: 6.1, 6.2_
 
 - [ ] 2. Implement basic vault scanning and file analysis
-    - [ ] 2.1 Create MarkdownFile entity with frontmatter parsing
+    - [-] 2.1 Create MarkdownFile entity with frontmatter parsing
         - Implement basic MarkdownFile class with YAML frontmatter parsing
         - Add file content loading and basic validation
         - Handle parsing errors gracefully
