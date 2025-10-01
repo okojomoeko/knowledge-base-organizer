@@ -1,229 +1,218 @@
-# Implementation Plan
+# Implementation Plan - Use Case Driven Approach
 
-- [ ] 1. Set up project structure and core interfaces
-    - Create directory structure for domain, application, and infrastructure layers
-    - Define base interfaces and abstract classes for repositories and services
-    - Set up configuration management with Pydantic models
-    - Configure CLI framework with Typer and Rich
-    - _Requirements: 6.1, 6.2, 6.3_
+## Phase 1: MVP - Basic Vault Analysis (Vertical Slice)
 
-- [ ] 2. Implement core domain models and value objects
+- [x] 1. Set up minimal project structure for vault analysis
+    - Create basic project structure with src/knowledge_base_organizer
+    - Set up pyproject.toml with essential dependencies (pydantic, typer, rich)
+    - Create minimal CLI entry point for vault analysis
+    - Set up basic configuration loading
+    - _Requirements: 6.1, 6.2_
+
+- [ ] 2. Implement basic vault scanning and file analysis
     - [ ] 2.1 Create MarkdownFile entity with frontmatter parsing
-        - Implement MarkdownFile class with path, content, and metadata handling
-        - Add YAML frontmatter parsing with error handling
-        - Implement content extraction and basic validation
+        - Implement basic MarkdownFile class with YAML frontmatter parsing
+        - Add file content loading and basic validation
+        - Handle parsing errors gracefully
         - _Requirements: 1.1, 1.2_
 
-    - [ ] 2.2 Implement WikiLink and RegularLink value objects
-        - Create WikiLink class for [[id|alias]] and [[id]] format parsing
-        - Implement RegularLink class for [text](url) format parsing
-        - Add position tracking (line number, column start/end)
-        - _Requirements: 2.1, 2.2, 3.1, 3.2_
+    - [ ] 2.2 Create FileRepository for vault scanning
+        - Implement recursive markdown file discovery
+        - Add basic include/exclude pattern filtering
+        - Create file loading with error handling
+        - _Requirements: 1.1, 6.1_
 
-    - [ ] 2.3 Create Frontmatter value object with validation
-        - Implement Frontmatter class with type-safe field access
-        - Add normalization methods for consistent formatting
-        - Implement validation against schema rules
-        - _Requirements: 1.3, 1.4_
+    - [ ] 2.3 Implement basic CLI command for vault analysis
+        - Create `analyze` command that scans vault and reports basic statistics
+        - Show file count, frontmatter field distribution, basic link counts
+        - Output results in JSON format for automation
+        - _Requirements: 5.1, 5.4_
 
-    - [ ] 2.4 Write unit tests for domain models
-        - Create comprehensive test suite for MarkdownFile entity
-        - Test WikiLink and RegularLink parsing edge cases
-        - Test Frontmatter validation and normalization
-        - _Requirements: 1.1, 2.1, 3.1_
+    - [ ] 2.4 Test with real vault data
+        - Test analysis command with test-myvault sample data
+        - Verify frontmatter parsing works with various templates
+        - Ensure error handling works with malformed files
+        - _Requirements: 1.1_
 
-- [ ] 3. Implement template-based schema management
-    - [ ] 3.1 Create TemplateSchemaRepository
-        - Implement template file discovery in configured directories
-        - Add frontmatter extraction from template files
-        - Create schema generation from template variables
+## Phase 2: Frontmatter Validation (Complete Feature)
+
+- [ ] 3. Implement template-based frontmatter validation
+    - [ ] 3.1 Create template schema extraction system
+        - Implement TemplateSchemaRepository to scan template directories
+        - Parse frontmatter from template files (new-fleeing-note.md, booksearchtemplate.md)
+        - Convert template variables to validation rules
         - _Requirements: 1.1, 6.2_
 
-    - [ ] 3.2 Implement template detection logic
-        - Add directory-based template type detection
-        - Implement content-based template matching
-        - Create configurable template mapping rules
-        - _Requirements: 1.4, 6.3_
+    - [ ] 3.2 Implement frontmatter validation logic
+        - Create FrontmatterSchema with validation methods
+        - Add template type detection (directory-based and content-based)
+        - Generate fix suggestions for non-conforming frontmatter
+        - _Requirements: 1.3, 1.4, 1.5_
 
-    - [ ] 3.3 Create FrontmatterSchema with validation rules
-        - Implement schema field definitions and types
-        - Add validation methods for frontmatter compliance
-        - Create fix suggestion generation for non-conforming fields
-        - _Requirements: 1.3, 1.5, 1.6_
+    - [ ] 3.3 Create validate-frontmatter CLI command
+        - Implement complete CLI command with dry-run and execute modes
+        - Add interactive mode for reviewing and applying fixes
+        - Support CSV/JSON output for automation
+        - _Requirements: 1.5, 1.6, 5.1, 5.4_
 
-    - [ ] 3.4 Write unit tests for template schema system
-        - Test template parsing with various Templater syntax patterns
-        - Test schema validation with sample frontmatter data
-        - Test template detection accuracy with test vault data
-        - _Requirements: 1.1, 1.3, 1.4_
+    - [ ] 3.4 Test frontmatter validation end-to-end
+        - Test with various template types in test vault
+        - Verify fix suggestions are accurate and safe
+        - Test backup creation and rollback functionality
+        - _Requirements: 1.1, 1.3, 1.6_
 
-- [ ] 4. Implement file repository and I/O operations
-    - [ ] 4.1 Create FileRepository with vault scanning
-        - Implement recursive markdown file discovery
-        - Add include/exclude pattern filtering
-        - Create file loading with error handling and recovery
-        - _Requirements: 1.1, 6.1, 6.2_
+## Phase 3: Basic Link Detection (Complete Feature)
 
-    - [ ] 4.2 Implement backup and file modification system
-        - Add timestamped backup creation before modifications
-        - Implement safe file writing with atomic operations
-        - Create rollback functionality for failed operations
-        - _Requirements: 1.6, 6.4_
+- [ ] 4. Implement WikiLink and dead link detection
+    - [ ] 4.1 Create link parsing and analysis
+        - Implement WikiLink and RegularLink value objects
+        - Create LinkAnalysisService for link extraction
+        - Add exclusion zone detection (frontmatter, existing links, Link Reference Definitions)
+        - _Requirements: 2.1, 2.2, 2.3, 7.1, 7.2_
 
-    - [ ] 4.3 Write integration tests for file operations
-        - Test vault scanning with test-myvault sample data
-        - Test backup creation and file modification workflows
-        - Test error handling with corrupted or locked files
-        - _Requirements: 1.1, 1.6_
+    - [ ] 4.2 Implement dead link detection
+        - Create file registry for link target validation
+        - Detect broken WikiLinks and empty regular links
+        - Generate comprehensive dead link reports
+        - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 5. Implement basic link analysis and detection
-    - [ ] 5.1 Create LinkAnalysisService for basic link detection
-        - Implement WikiLink extraction from markdown content
-        - Add regular link detection and validation
-        - Create exclusion zone detection (existing links, frontmatter)
-        - _Requirements: 2.1, 2.2, 2.3, 2.4_
+    - [ ] 4.3 Create detect-dead-links CLI command
+        - Implement CLI command with structured output
+        - Add fix suggestions for common dead link patterns
+        - Support filtering and sorting of results
+        - _Requirements: 3.4, 3.6, 5.1, 5.4_
 
-    - [ ] 5.2 Implement ContentProcessingService for text manipulation
-        - Add Link Reference Definition detection and exclusion
-        - Implement table content exclusion (configurable)
-        - Create safe text replacement with position tracking
-        - _Requirements: 2.3, 2.4, 2.5, 7.1, 7.2_
+    - [ ] 4.4 Test link detection with real data
+        - Test with test-myvault to find actual dead links
+        - Verify exclusion zones work correctly
+        - Test performance with large numbers of files
+        - _Requirements: 3.1, 3.2_
 
-    - [ ] 5.3 Create dead link detection functionality
-        - Implement WikiLink target validation against file registry
-        - Add regular link validation (empty URLs, malformed links)
-        - Create comprehensive dead link reporting
-        - _Requirements: 3.1, 3.2, 3.3, 3.4_
+## Phase 4: Basic Auto-Linking (Complete Feature)
 
-    - [ ] 5.4 Write unit tests for link analysis
-        - Test link extraction with various markdown patterns
-        - Test exclusion zone detection accuracy
-        - Test dead link detection with sample vault data
-        - _Requirements: 2.1, 2.2, 3.1, 3.2_
+- [ ] 5. Implement basic auto-link generation
+    - [ ] 5.1 Create content processing for link candidates
+        - Implement ContentProcessingService for safe text replacement
+        - Add link candidate detection (exact title/alias matches)
+        - Create position tracking and conflict resolution
+        - _Requirements: 2.1, 2.4, 2.5_
 
-- [ ] 6. Implement advanced Japanese synonym detection
-    - [ ] 6.1 Create JapaneseSynonymService with katakana variation handling
-        - Implement katakana long vowel variation detection
-        - Add consonant variation patterns (ヴ/ブ, ティ/チ, etc.)
-        - Create variation generation algorithms
-        - _Requirements: 2.1, 2.6, 2.7_
-
-    - [ ] 6.2 Implement synonym pattern matching system
-        - Add configurable synonym pattern definitions
-        - Implement confidence scoring for matches
-        - Create English-Japanese term pair matching
-        - _Requirements: 2.6, 2.7, 2.8_
-
-    - [ ] 6.3 Create bidirectional alias management
-        - Implement automatic alias addition to target files
-        - Add duplicate alias detection and prevention
-        - Create alias limit enforcement and management
+    - [ ] 5.2 Implement basic auto-link generation
+        - Create AutoLinkGenerationUseCase for orchestrating link creation
+        - Add bidirectional file updates (source + target alias updates)
+        - Implement dry-run mode with preview
         - _Requirements: 2.8, 2.9_
 
-    - [ ] 6.4 Write unit tests for Japanese language processing
-        - Test katakana variation generation with known patterns
-        - Test synonym matching accuracy with Japanese text samples
-        - Test bidirectional alias updates
+    - [ ] 5.3 Create auto-link CLI command
+        - Implement CLI command with safety controls (max links per file)
+        - Add progress reporting for large vaults
+        - Support configurable exclusion patterns
+        - _Requirements: 5.1, 5.2, 5.3_
+
+    - [ ] 5.4 Test basic auto-linking
+        - Test with test-myvault data to create actual links
+        - Verify no existing content is corrupted
+        - Test rollback functionality
+        - _Requirements: 2.1, 2.8_
+
+## Phase 5: Advanced Japanese Synonym Detection
+
+- [ ] 6. Implement Japanese language processing
+    - [ ] 6.1 Create katakana variation detection
+        - Implement JapaneseSynonymService with variation patterns
+        - Add long vowel and consonant variation handling
+        - Create confidence scoring for matches
+        - _Requirements: 2.6, 2.7_
+
+    - [ ] 6.2 Integrate synonym detection with auto-linking
+        - Extend AutoLinkGenerationUseCase with synonym support
+        - Add configurable confidence thresholds
+        - Implement bidirectional alias management
         - _Requirements: 2.6, 2.7, 2.8_
 
-- [ ] 7. Implement use cases and application services
-    - [ ] 7.1 Create FrontmatterValidationUseCase
-        - Implement template-based validation workflow
-        - Add interactive and automatic fix application modes
-        - Create structured validation result reporting
-        - _Requirements: 1.3, 1.5, 1.6, 5.4_
+    - [ ] 6.3 Test advanced synonym detection
+        - Test katakana variations with Japanese content
+        - Verify bidirectional alias updates work correctly
+        - Test performance impact of synonym detection
+        - _Requirements: 2.6, 2.7_
 
-    - [ ] 7.2 Implement AutoLinkGenerationUseCase
-        - Create comprehensive link candidate detection
-        - Add advanced synonym-based link generation
-        - Implement bidirectional file updates
-        - _Requirements: 2.1, 2.6, 2.7, 2.8, 2.9_
+## Phase 6: Content Aggregation (Complete Feature)
 
-    - [ ] 7.3 Create DeadLinkDetectionUseCase
-        - Implement comprehensive dead link scanning
-        - Add fix suggestion generation
-        - Create structured dead link reporting
-        - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.6_
+- [ ] 7. Implement content aggregation
+    - [ ] 7.1 Create tag-based filtering and aggregation
+        - Implement ContentAggregationUseCase
+        - Add tag-based note selection and filtering
+        - Create content merging with source attribution
+        - _Requirements: 4.1, 4.2, 4.3_
 
-    - [ ] 7.4 Implement ContentAggregationUseCase
-        - Create tag-based note filtering and selection
-        - Add content merging with source attribution
-        - Implement deduplication and formatting
-        - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
+    - [ ] 7.2 Create aggregate CLI command
+        - Implement CLI command for content aggregation
+        - Add deduplication and formatting options
+        - Support multiple output formats
+        - _Requirements: 4.4, 4.5, 5.1_
 
-    - [ ] 7.5 Write integration tests for use cases
-        - Test complete workflows with test vault data
-        - Test error handling and recovery scenarios
-        - Test dry-run vs actual execution modes
-        - _Requirements: 1.1, 2.1, 3.1, 4.1_
+    - [ ] 7.3 Test content aggregation
+        - Test with various tag combinations
+        - Verify merged content maintains readability
+        - Test with large content volumes
+        - _Requirements: 4.1, 4.2_
 
-- [ ] 8. Implement CLI interface and output formatting
-    - [ ] 8.1 Create CLI commands with Typer
-        - Implement validate-frontmatter command with all options
-        - Add auto-link command with advanced detection features
-        - Create detect-dead-links command with comprehensive reporting
-        - Add aggregate command with flexible filtering
-        - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+## Phase 7: Performance Optimization and Polish
 
-    - [ ] 8.2 Implement output rendering and formatting
-        - Create JSON output formatter for structured data
-        - Add CSV output formatter for spreadsheet compatibility
-        - Implement Rich console output with progress indicators
-        - Add verbose logging and debug output modes
-        - _Requirements: 5.4, 5.6, 5.7_
-
-    - [ ] 8.3 Add configuration file support
-        - Implement YAML configuration loading and validation
-        - Create default configuration generation
-        - Add configuration validation with helpful error messages
-        - _Requirements: 6.1, 6.2, 6.3, 6.5, 6.6_
-
-    - [ ] 8.4 Write CLI integration tests
-        - Test all CLI commands with various parameter combinations
-        - Test output formatting in different modes
-        - Test configuration loading and error handling
-        - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
-
-- [ ] 9. Performance optimization and error handling
-    - [ ] 9.1 Implement caching and indexing systems
+- [ ] 8. Optimize performance and add advanced features
+    - [ ] 8.1 Implement caching and indexing
         - Add file registry caching for repeated operations
-        - Create synonym pattern indexing for fast lookup
-        - Implement incremental processing for large vaults
+        - Create synonym pattern indexing
+        - Implement incremental processing
         - _Requirements: 2.9, 6.4_
 
-    - [ ] 9.2 Add comprehensive error handling and recovery
-        - Implement graceful error handling for file processing
-        - Add detailed error reporting with actionable suggestions
-        - Create automatic retry mechanisms for transient failures
-        - _Requirements: 1.1, 5.5, 5.6_
+    - [ ] 8.2 Add comprehensive error handling
+        - Implement graceful error recovery
+        - Add detailed error reporting with suggestions
+        - Create automatic retry mechanisms
+        - _Requirements: 5.5, 5.6_
 
-    - [ ] 9.3 Optimize memory usage and processing speed
-        - Implement streaming processing for large files
-        - Add parallel processing for independent operations
-        - Create configurable batch sizes and memory limits
-        - _Requirements: 6.4_
-
-    - [ ] 9.4 Write performance and stress tests
-        - Test processing speed with large vault datasets
-        - Test memory usage with various file sizes and counts
-        - Test error recovery with simulated failure scenarios
-        - _Requirements: 1.1, 2.1, 3.1_
-
-- [ ] 10. Integration testing and documentation
-    - [ ] 10.1 Create comprehensive integration test suite
-        - Test complete workflows with real vault data
-        - Add edge case testing with malformed files
-        - Create regression tests for critical functionality
+    - [ ] 8.3 Create comprehensive test suite
+        - Add integration tests for all use cases
+        - Create performance benchmarks
+        - Add edge case and error condition tests
         - _Requirements: 1.1, 2.1, 3.1, 4.1, 5.1_
 
-    - [ ] 10.2 Implement example configurations and usage guides
-        - Create sample configuration files for common use cases
-        - Add example vault structures and expected outputs
-        - Create troubleshooting guides for common issues
-        - _Requirements: 6.5, 6.6_
-
-    - [ ] 10.3 Write comprehensive documentation
-        - Create API documentation for all public interfaces
-        - Add user guide with examples and best practices
-        - Create developer documentation for extending the system
+    - [ ] 8.4 Documentation and examples
+        - Create user guide with examples
+        - Add configuration templates
+        - Create troubleshooting guide
         - _Requirements: 5.6, 6.6_
+
+## Benefits of This Approach
+
+### ✅ User Value First
+
+- **Phase 1**: すぐに使える分析機能
+- **Phase 2**: 完全なfrontmatter検証機能
+- **Phase 3**: 完全なデッドリンク検出機能
+- **Phase 4**: 基本的な自動リンク生成機能
+
+### ✅ Early Feedback
+
+- 各フェーズで実際のvaultデータでテスト
+- 問題の早期発見と修正
+- ユーザーからのフィードバック収集
+
+### ✅ Risk Mitigation
+
+- 小さな単位での統合テスト
+- 段階的な機能追加
+- 各フェーズでの品質確保
+
+### ✅ Agile Development
+
+- 各フェーズが独立して価値を提供
+- 優先度に応じた開発順序調整可能
+- 継続的なデリバリー
+
+### ✅ Technical Benefits
+
+- 実際のデータでの早期検証
+- アーキテクチャの段階的進化
+- パフォーマンス問題の早期発見

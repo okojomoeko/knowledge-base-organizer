@@ -8,6 +8,8 @@ requires-python = ">=3.13"
 dependencies = [
     "pydantic>=2.11.9",
     "typer>=0.19.2",
+    "rich>=13.0.0",
+    "pyyaml>=6.0.0",
 ]
 
 [dependency-groups]
@@ -28,6 +30,7 @@ dev = [
     "pytest-mock>=3.15.1",
     "ruff>=0.13.2",
     "safety>=3.6.2",
+    "types-pyyaml>=6.0.12.20250915",
 ]
 
 doc = [
@@ -40,7 +43,7 @@ doc = [
 ]
 
 [project.scripts]
-knowledge-base-organizer = "knowledge_base_organizer:main"
+knowledge-base-organizer = "knowledge_base_organizer.main:main"
 
 [build-system]
 requires = ["hatchling"]
