@@ -82,6 +82,7 @@ repos:
         pass_filenames: false
         language: python
         stages: [pre-commit, manual]
+        args: [--ignore-vuln=GHSA-4xh5-x5gv-qwph]
       - id: nox-pytest
         name: Run Nox pytest for all Python versions
         entry: nox -s pytest

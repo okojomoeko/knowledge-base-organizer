@@ -1,0 +1,1 @@
+.kiro/db_migration/design.md .kiro/db_migration/tasks.md .kiro/db_migration/requirements.md .kiro/steering/commit-message-guidelines.md .kiro/steering/product.md .kiro/steering/python-best-practices.md .kiro/steering/safe-development-workflow.md .kiro/steering/senior-python-engineer.md .kiro/steering/structure.md .kiro/steering/tech.md
