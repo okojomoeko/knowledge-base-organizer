@@ -203,11 +203,11 @@ tags: [test, example]
         config = ProcessingConfig.get_default_config()
         repo = FileRepository(config)
 
-        frontmatter, _body = repo._parse_frontmatter(content)
+        frontmatter, body = repo._parse_frontmatter(content)
 
         assert frontmatter.title == "Test File"
         assert frontmatter.tags == ["test", "example"]
-        assert "# Content here" in _body
+        assert "# Content here" in body
 
     def test_parse_frontmatter_with_yaml_error(self) -> None:
         """Test frontmatter parsing with YAML syntax error."""

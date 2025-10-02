@@ -207,13 +207,13 @@ class MarkdownFile(BaseModel):
 
         if type_name == "string":
             return isinstance(value, str)
-        elif type_name == "array":
+        if type_name == "array":
             return isinstance(value, list)
-        elif type_name == "boolean":
+        if type_name == "boolean":
             return isinstance(value, bool)
-        elif type_name == "integer":
+        if type_name == "integer":
             return isinstance(value, int)
-        elif type_name == "number":
+        if type_name == "number":
             return isinstance(value, (int, float))
 
         return True  # Unknown type, assume valid

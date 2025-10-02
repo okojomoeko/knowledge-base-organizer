@@ -10,19 +10,19 @@ from knowledge_base_organizer.cli.main import app
 class TestAnalyzeCommand:
     """Test the analyze CLI command."""
 
-    def test_analyze_command_help(self):
+    def test_analyze_command_help(self) -> None:
         """Test that analyze command help works."""
         runner = CliRunner()
-        result = runner.invoke(app, ["analyze", "--help"])
+        result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0
         assert "Analyze vault and report basic statistics" in result.stdout
 
-    def test_analyze_command_with_test_vault_json(self):
+    def test_analyze_command_with_test_vault_json(self) -> None:
         """Test analyze command with test vault in JSON format."""
         runner = CliRunner()
         vault_path = "tests/test-data/vaults/test-myvault"
 
-        result = runner.invoke(app, ["analyze", vault_path, "--output-format", "json"])
+        result = runner.invoke(app, [vault_path, "--output-format", "json"])
 
         # Should succeed despite warnings
         assert result.exit_code == 0
@@ -71,14 +71,12 @@ class TestAnalyzeCommand:
         assert "link_reference_definitions" in link_stats
         assert "total_links" in link_stats
 
-    def test_analyze_command_with_test_vault_console(self):
+    def test_analyze_command_with_test_vault_console(self) -> None:
         """Test analyze command with test vault in console format."""
         runner = CliRunner()
         vault_path = "tests/test-data/vaults/test-myvault"
 
-        result = runner.invoke(
-            app, ["analyze", vault_path, "--output-format", "console"]
-        )
+        result = runner.invoke(app, [vault_path, "--output-format", "console"])
 
         # Should succeed despite warnings
         assert result.exit_code == 0
@@ -90,30 +88,30 @@ class TestAnalyzeCommand:
         assert "🔗 Link Statistics" in result.stdout
         assert "📝 Content Statistics" in result.stdout
 
-    def test_analyze_command_with_nonexistent_vault(self):
+    def test_analyze_command_with_nonexistent_vault(self) -> None:
         """Test analyze command with nonexistent vault."""
         runner = CliRunner()
         vault_path = "nonexistent/vault/path"
 
-        result = runner.invoke(app, ["analyze", vault_path])
+        result = runner.invoke(app, [vault_path])
 
         # Should fail with exit code 1
         assert result.exit_code == 1
         assert "Error:" in result.stdout
 
-    def test_analyze_command_with_include_patterns(self):
+    def test_analyze_command_with_include_patterns(self) -> None:
         """Test analyze command with include patterns."""
         runner = CliRunner()
         vault_path = "tests/test-data/vaults/test-myvault"
 
         result = runner.invoke(
-            app, ["analyze", vault_path, "--include", "*.md", "--output-format", "json"]
+            app, [vault_path, "--include", "*.md", "--output-format", "json"]
         )
 
         # Should succeed
         assert result.exit_code == 0
 
-    def test_analyze_command_with_exclude_patterns(self):
+    def test_analyze_command_with_exclude_patterns(self) -> None:
         """Test analyze command with exclude patterns."""
         runner = CliRunner()
         vault_path = "tests/test-data/vaults/test-myvault"
@@ -121,7 +119,6 @@ class TestAnalyzeCommand:
         result = runner.invoke(
             app,
             [
-                "analyze",
                 vault_path,
                 "--exclude",
                 "template*",
@@ -133,13 +130,13 @@ class TestAnalyzeCommand:
         # Should succeed
         assert result.exit_code == 0
 
-    def test_analyze_command_verbose(self):
+    def test_analyze_command_verbose(self) -> None:
         """Test analyze command with verbose output."""
         runner = CliRunner()
         vault_path = "tests/test-data/vaults/test-myvault"
 
         result = runner.invoke(
-            app, ["analyze", vault_path, "--verbose", "--output-format", "console"]
+            app, [vault_path, "--verbose", "--output-format", "console"]
         )
 
         # Should succeed and show verbose output

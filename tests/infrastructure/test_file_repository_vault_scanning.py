@@ -49,7 +49,8 @@ id: "20230101120000"
             markdown_files = repo.load_vault(temp_path)
 
             # Should find all 3 markdown files
-            assert len(markdown_files) == 3
+            expected_files = 3
+            assert len(markdown_files) == expected_files
 
             # Check that all files are MarkdownFile instances
             for file in markdown_files:
@@ -81,7 +82,7 @@ id: "20230101120000"
                 (temp_path / "regular.md", True),  # Should be included
             ]
 
-            for file_path, should_include in files_to_create:
+            for file_path, _should_include in files_to_create:
                 file_path.write_text("""---
 title: Test File
 ---
@@ -131,7 +132,7 @@ title: Test File
                 (temp_path / "root.md", False),  # No matching pattern
             ]
 
-            for file_path, should_include in files_to_create:
+            for file_path, _should_include in files_to_create:
                 file_path.write_text("""---
 title: Test File
 ---
@@ -178,7 +179,7 @@ title: Test File
                 ),  # Should be excluded
             ]
 
-            for file_path, should_include in files_to_create:
+            for file_path, _should_include in files_to_create:
                 file_path.write_text("""---
 title: Test File
 ---
@@ -240,7 +241,8 @@ invalid_yaml: [unclosed
             markdown_files = repo.load_vault(temp_path)
 
             # Should load all files, even those with issues
-            assert len(markdown_files) == 4
+            expected_files_with_errors = 4
+            assert len(markdown_files) == expected_files_with_errors
 
             # Find the valid file
             valid_files = [f for f in markdown_files if f.path.name == "valid.md"]
@@ -342,7 +344,8 @@ title: Regular File
             # Load vault
             markdown_files = repo.load_vault(temp_path)
 
-            assert len(markdown_files) == 3
+            expected_files_with_ids = 3
+            assert len(markdown_files) == expected_files_with_ids
 
             # Check ID extraction
             files_by_name = {f.path.name: f for f in markdown_files}

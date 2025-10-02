@@ -32,7 +32,7 @@ class ProcessingConfig(BaseModel):
         if not config_path.exists():
             return cls()
 
-        with open(config_path, encoding="utf-8") as f:
+        with config_path.open(encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
 
         return cls(**data)

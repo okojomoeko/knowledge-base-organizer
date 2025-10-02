@@ -1,4 +1,7 @@
-"""Knowledge Base Organizer - Obsidian vault organizer with advanced Japanese WikiLink detection."""
+"""Knowledge Base Organizer.
+
+Obsidian vault organizer with advanced Japanese WikiLink detection.
+"""
 
 from knowledge_base_organizer.cli.main import main
 

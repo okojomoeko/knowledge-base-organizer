@@ -149,24 +149,24 @@ class FileRepository:
             normalized_key = key.lower().strip()
 
             # Handle common field name variations
-            if normalized_key in ["tag", "category", "categories"]:
+            if normalized_key in {"tag", "category", "categories"}:
                 normalized_key = "tags"
-            elif normalized_key in ["alias", "aka"]:
+            elif normalized_key in {"alias", "aka"}:
                 normalized_key = "aliases"
-            elif normalized_key in ["created", "created_date", "creation_date"]:
+            elif normalized_key in {"created", "created_date", "creation_date"}:
                 normalized_key = "date"
-            elif normalized_key in ["published", "public"]:
+            elif normalized_key in {"published", "public"}:
                 normalized_key = "publish"
             else:
                 normalized_key = key  # Keep original case for other fields
 
             # Normalize values
-            if normalized_key in ["tags", "aliases"] and isinstance(value, str):
+            if normalized_key in {"tags", "aliases"} and isinstance(value, str):
                 # Convert single string to list
                 normalized[normalized_key] = [value]
             elif normalized_key == "publish" and isinstance(value, str):
                 # Convert string to boolean
-                normalized[normalized_key] = value.lower() in ["true", "yes", "1"]
+                normalized[normalized_key] = value.lower() in {"true", "yes", "1"}
             else:
                 normalized[normalized_key] = value
 
@@ -199,5 +199,4 @@ class FileRepository:
                 frontmatter_dict, default_flow_style=False, allow_unicode=True
             )
             return f"---\n{frontmatter_yaml}---\n{file.content}"
-        else:
-            return file.content
+        return file.content
