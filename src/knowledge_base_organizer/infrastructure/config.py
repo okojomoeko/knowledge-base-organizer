@@ -23,8 +23,26 @@ class ProcessingConfig(BaseModel):
     max_links_per_file: int = 50
     backup_enabled: bool = True
     template_directories: list[str] = Field(
-        default_factory=lambda: ["900_TemplaterNotes", "903_BookSearchTemplates"]
+        default_factory=lambda: [
+            "900_TemplaterNotes",
+            "903_BookSearchTemplates",
+            "Templates",
+            "templates",
+        ]
     )
+
+    # Template detection settings
+    directory_template_mappings: dict[str, str] = Field(
+        default_factory=lambda: {
+            "100_FleetingNotes": "new-fleeing-note",
+            "104_Books": "booksearchtemplate",
+            "Books": "booksearchtemplate",
+            "FleetingNotes": "new-fleeing-note",
+            "Notes": "new-fleeing-note",
+        }
+    )
+
+    fallback_template: str = "new-fleeing-note"
 
     @classmethod
     def from_file(cls, config_path: Path) -> "ProcessingConfig":

@@ -1,0 +1,230 @@
+"""Use case for frontmatter validation against template schemas."""
+
+from pathlib import Path
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict
+
+from ..domain.models import ValidationResult
+from ..infrastructure.config import ProcessingConfig
+from ..infrastructure.file_repository import FileRepository
+from ..infrastructure.template_schema_repository import TemplateSchemaRepository
+
+
+class FrontmatterValidationRequest(BaseModel):
+    """Request for frontmatter validation."""
+
+    model_config = ConfigDict(
+        validate_assignment=True,
+        extra="forbid",
+    )
+
+    vault_path: Path
+    dry_run: bool = True
+    include_patterns: list[str] | None = None
+    exclude_patterns: list[str] | None = None
+    template_name: str | None = None  # Validate against specific template
+
+
+class FrontmatterValidationResult(BaseModel):
+    """Result of frontmatter validation operation."""
+
+    model_config = ConfigDict(
+        validate_assignment=True,
+        extra="forbid",
+    )
+
+    results: list[ValidationResult]
+    schemas_used: dict[str, Any]
+    total_files: int
+    valid_files: int
+    invalid_files: int
+    files_with_warnings: int
+    summary: dict[str, Any]
+
+
+class FrontmatterValidationUseCase:
+    """Use case for validating frontmatter against template schemas."""
+
+    def __init__(
+        self,
+        file_repository: FileRepository,
+        template_schema_repository: TemplateSchemaRepository,
+        config: ProcessingConfig,
+    ) -> None:
+        """Initialize frontmatter validation use case."""
+        self.file_repository = file_repository
+        self.template_schema_repository = template_schema_repository
+        self.config = config
+
+    def execute(
+        self, request: FrontmatterValidationRequest
+    ) -> FrontmatterValidationResult:
+        """Execute frontmatter validation."""
+        # 1. Extract schemas from template files (Single Source of Truth)
+        schemas = self.template_schema_repository.extract_schemas_from_templates()
+
+        if not schemas:
+            return FrontmatterValidationResult(
+                results=[],
+                schemas_used={},
+                total_files=0,
+                valid_files=0,
+                invalid_files=0,
+                files_with_warnings=0,
+                summary={"error": "No template schemas found"},
+            )
+
+        # 2. Load all markdown files from vault
+        files = self.file_repository.load_vault(request.vault_path)
+
+        if not files:
+            return FrontmatterValidationResult(
+                results=[],
+                schemas_used={
+                    schema.template_name: schema.template_path
+                    for schema in schemas.values()
+                },
+                total_files=0,
+                valid_files=0,
+                invalid_files=0,
+                files_with_warnings=0,
+                summary={"error": "No markdown files found"},
+            )
+
+        # 3. Validate each file
+        results = []
+        valid_count = 0
+        invalid_count = 0
+        warnings_count = 0
+
+        for file in files:
+            # Detect appropriate template type for each file
+            if request.template_name:
+                template_type = request.template_name
+            else:
+                template_type = self.template_schema_repository.detect_template_type(
+                    file
+                )
+
+            if template_type and template_type in schemas:
+                schema = schemas[template_type]
+
+                # Validate frontmatter against detected template schema
+                validation_result = schema.validate_frontmatter(file.frontmatter)
+                validation_result.file_path = file.path
+                validation_result.template_type = template_type
+
+                # Apply fixes if not dry-run
+                if not request.dry_run and not validation_result.is_valid:
+                    fixes = schema.suggest_fixes(file.frontmatter)
+                    self._apply_fixes(file, fixes)
+
+                results.append(validation_result)
+
+                # Update counters
+                if validation_result.is_valid:
+                    valid_count += 1
+                else:
+                    invalid_count += 1
+
+                if validation_result.warnings:
+                    warnings_count += 1
+
+            else:
+                # No template detected - create a basic validation result
+                validation_result = ValidationResult(
+                    file_path=file.path,
+                    template_type=None,
+                    is_valid=True,  # No schema to validate against
+                    missing_fields=[],
+                    invalid_fields={},
+                    suggested_fixes={},
+                    warnings=["No template schema detected for this file"],
+                )
+                results.append(validation_result)
+                valid_count += 1
+                warnings_count += 1
+
+        # 4. Generate summary
+        summary = self._generate_summary(results, schemas)
+
+        return FrontmatterValidationResult(
+            results=results,
+            schemas_used={
+                name: str(schema.template_path) for name, schema in schemas.items()
+            },
+            total_files=len(files),
+            valid_files=valid_count,
+            invalid_files=invalid_count,
+            files_with_warnings=warnings_count,
+            summary=summary,
+        )
+
+    def _apply_fixes(self, file: Any, fixes: list[Any]) -> None:
+        """Apply suggested fixes to a file's frontmatter."""
+        # This is a placeholder for actual fix application
+        # In a real implementation, this would modify the file's frontmatter
+        # and save it back to disk
+
+    def _generate_summary(
+        self, results: list[ValidationResult], schemas: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Generate validation summary statistics."""
+        total_files = len(results)
+        valid_files = sum(1 for r in results if r.is_valid)
+        invalid_files = total_files - valid_files
+
+        # Count issues by type
+        missing_fields_count = sum(len(r.missing_fields) for r in results)
+        invalid_fields_count = sum(len(r.invalid_fields) for r in results)
+        warnings_count = sum(len(r.warnings) for r in results)
+
+        # Template usage statistics
+        template_usage = {}
+        for result in results:
+            if result.template_type:
+                template_usage[result.template_type] = (
+                    template_usage.get(result.template_type, 0) + 1
+                )
+
+        # Most common issues
+        all_missing_fields = []
+        all_invalid_fields = []
+        for result in results:
+            all_missing_fields.extend(result.missing_fields)
+            all_invalid_fields.extend(result.invalid_fields.keys())
+
+        missing_field_counts = {}
+        for field in all_missing_fields:
+            missing_field_counts[field] = missing_field_counts.get(field, 0) + 1
+
+        invalid_field_counts = {}
+        for field in all_invalid_fields:
+            invalid_field_counts[field] = invalid_field_counts.get(field, 0) + 1
+
+        return {
+            "total_files": total_files,
+            "valid_files": valid_files,
+            "invalid_files": invalid_files,
+            "validation_rate": f"{(valid_files / total_files * 100):.1f}%"
+            if total_files > 0
+            else "0%",
+            "issues": {
+                "missing_fields": missing_fields_count,
+                "invalid_fields": invalid_fields_count,
+                "warnings": warnings_count,
+            },
+            "template_usage": template_usage,
+            "schemas_found": len(schemas),
+            "most_common_missing_fields": dict(
+                sorted(missing_field_counts.items(), key=lambda x: x[1], reverse=True)[
+                    :5
+                ]
+            ),
+            "most_common_invalid_fields": dict(
+                sorted(invalid_field_counts.items(), key=lambda x: x[1], reverse=True)[
+                    :5
+                ]
+            ),
+        }
