@@ -20,7 +20,18 @@ def lint(session: nox.Session) -> None:
     """Run ruff formatter and linter."""
     session.run("uv", "sync", "--group", "dev", "--reinstall")
     session.run("uv", "run", "ruff", "format", "--preview", "src", "tests")
-    session.run("uv", "run", "ruff", "check", "--fix", "--preview", "src", "tests")
+    session.run(
+        "uv",
+        "run",
+        "ruff",
+        "check",
+        "--fix",
+        "--preview",
+        "src",
+        "tests",
+        "--exclude",
+        "experiments",
+    )
     # or
     # session.run("uvx", "ruff", "format", "--preview", "src", "tests")
     # session.run("uvx", "ruff", "check", "--fix", "--preview", "src", "tests")
@@ -38,7 +49,9 @@ def lizard(session: nox.Session) -> None:
         "--CCN=20",
         "--length=100",
         "--arguments=5",
-        "--modified",
+        "--exclude=experiments/*",
+        "src",
+        "tests",
     )
 
 

@@ -96,9 +96,8 @@ class MarkdownFile(BaseModel):
     def validate_path_exists(cls, v: Path) -> Path:
         """Validate that the file path exists."""
         # Skip validation for test files that don't exist
-        if str(v) == "test.md" or not v.exists():
-            if str(v) != "test.md" and not v.exists():
-                raise ValueError(f"File does not exist: {v}")
+        if str(v) != "test.md" and not v.exists():
+            raise ValueError(f"File does not exist: {v}")
         return v
 
     def extract_file_id(self) -> str | None:
@@ -200,7 +199,9 @@ class MarkdownFile(BaseModel):
 
         return results
 
-    def _validate_field_type(self, value: Any, expected_type: dict[str, Any]) -> bool:
+    def _validate_field_type(
+        self, value: object, expected_type: dict[str, Any]
+    ) -> bool:
         """Validate a single field against its expected type."""
         type_name = expected_type.get("type", "string")
 

@@ -1,5 +1,6 @@
 """File repository for loading and saving markdown files."""
 
+import fnmatch
 import re
 from datetime import datetime
 from pathlib import Path
@@ -69,7 +70,7 @@ class FileRepository:
 
         return markdown_file
 
-    def save_file(self, file: MarkdownFile, backup: bool = True) -> None:
+    def save_file(self, file: MarkdownFile, *, backup: bool = True) -> None:
         """Save file with optional backup creation."""
         if backup and self.config.backup_enabled:
             self.create_backup(file.path)
@@ -89,11 +90,21 @@ class FileRepository:
         """Check if file should be included based on exclude patterns."""
         relative_path = file_path.relative_to(vault_path)
         relative_str = str(relative_path)
+        path_parts = relative_path.parts
 
-        return all(
-            not Path(relative_str).match(exclude_pattern)
-            for exclude_pattern in self.config.exclude_patterns
-        )
+        # Check against each exclude pattern
+        for exclude_pattern in self.config.exclude_patterns:
+            # Handle **/dirname/** patterns by checking path parts
+            if exclude_pattern.startswith("**/") and exclude_pattern.endswith("/**"):
+                # Extract directory name from **/dirname/** pattern
+                dir_name = exclude_pattern[3:-3]  # Remove **/ and /**
+                if dir_name in path_parts:
+                    return False
+            # Handle other patterns with fnmatch
+            elif fnmatch.fnmatch(relative_str, exclude_pattern):
+                return False
+
+        return True
 
     def _parse_frontmatter(self, content: str) -> tuple[Frontmatter, str]:
         """Parse frontmatter from markdown content with enhanced error handling."""
