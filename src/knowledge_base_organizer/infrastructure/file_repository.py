@@ -82,9 +82,17 @@ class FileRepository:
     def create_backup(self, file_path: Path) -> Path:
         """Create timestamped backup of file."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = file_path.with_suffix(f".{timestamp}.bak")
-        backup_path.write_text(file_path.read_text(encoding="utf-8"))
+        backup_path = file_path.with_suffix(f".backup_{timestamp}.bak")
+        backup_path.write_text(file_path.read_text(encoding="utf-8"), encoding="utf-8")
         return backup_path
+
+    def restore_from_backup(self, file_path: Path, backup_path: Path) -> None:
+        """Restore file from backup."""
+        if not backup_path.exists():
+            raise ValueError(f"Backup file does not exist: {backup_path}")
+
+        backup_content = backup_path.read_text(encoding="utf-8")
+        file_path.write_text(backup_content, encoding="utf-8")
 
     def _should_include_file(self, file_path: Path, vault_path: Path) -> bool:
         """Check if file should be included based on exclude patterns."""

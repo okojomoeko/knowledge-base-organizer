@@ -55,7 +55,7 @@
         - Support CSV/JSON output for automation
         - _Requirements: 1.5, 1.6, 5.1, 5.4_
 
-    - [ ] 3.4 Test frontmatter validation end-to-end
+    - [x] 3.4 Test frontmatter validation end-to-end
         - Test with various template types in test vault
         - Verify fix suggestions are accurate and safe
         - Test backup creation and rollback functionality
