@@ -1,0 +1,24 @@
+{
+  "total_files": 3,
+  "total_tags": 1,
+  "unique_tags": 1,
+  "tag_frequency": {
+    "programming": 1
+  },
+  "tag_cooccurrence": {
+    "programming": {}
+  },
+  "tag_relationships": {
+    "programming": {}
+  },
+  "most_common_tags": [
+    [
+      "programming",
+      1
+    ]
+  ],
+  "orphaned_tags": [
+    "programming"
+  ],
+  "analyzed_at": "2025-10-03 23:15:57.634503"
+}

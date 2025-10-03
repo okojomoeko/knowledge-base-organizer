@@ -188,8 +188,11 @@ def analyze_vault_tags(
     console.print(f"🔍 Analyzing vault: {vault_path}")
 
     # Load files
-    file_repo = FileRepository()
-    files = file_repo.load_vault_files(vault_path)
+    from ..infrastructure.config import ProcessingConfig
+
+    config = ProcessingConfig()
+    file_repo = FileRepository(config)
+    files = file_repo.load_vault(vault_path)
 
     console.print(f"📁 Found {len(files)} files")
 
@@ -256,7 +259,10 @@ def suggest_tags_for_file(
         raise typer.Exit(1)
 
     # Load file
-    file_repo = FileRepository()
+    from ..infrastructure.config import ProcessingConfig
+
+    config = ProcessingConfig()
+    file_repo = FileRepository(config)
     try:
         markdown_file = file_repo.load_file(file_path)
     except Exception as e:
@@ -338,8 +344,11 @@ def show_related_tags(
 
     # If vault path provided, update analysis first
     if vault_path:
-        file_repo = FileRepository()
-        files = file_repo.load_vault_files(vault_path)
+        from ..infrastructure.config import ProcessingConfig
+
+        config = ProcessingConfig()
+        file_repo = FileRepository(config)
+        files = file_repo.load_vault(vault_path)
         service.update_vault_tag_analysis(files)
 
     related = service.suggest_related_tags(tag, min_strength)
