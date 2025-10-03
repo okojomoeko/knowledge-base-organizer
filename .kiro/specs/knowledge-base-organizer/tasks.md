@@ -70,7 +70,7 @@
         - Create consistency checking (filename-title matching, tag normalization)
         - _Requirements: 8.1, 8.2, 8.3_
 
-    - [ ] 4.2 Implement automatic frontmatter enhancement
+    - [x] 4.2 Implement automatic frontmatter enhancement
         - Create FrontmatterEnhancementService for field completion
         - Add intelligent tag suggestion based on content analysis
         - Implement automatic date and metadata population

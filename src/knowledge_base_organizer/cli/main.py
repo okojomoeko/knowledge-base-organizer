@@ -34,6 +34,14 @@ app = typer.Typer(
 )
 console = Console()
 
+# Import and add tag management subcommand (conditional to avoid circular imports)
+try:
+    from .tag_management import app as tag_management_app
+
+    app.add_typer(tag_management_app, name="tags")
+except ImportError:
+    pass  # Tag management not available
+
 
 @app.command()
 def analyze(
