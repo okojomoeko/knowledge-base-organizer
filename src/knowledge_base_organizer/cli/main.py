@@ -383,19 +383,17 @@ def _output_validation_results(
         # Prepare CSV output
         csv_data = []
         for r in result.results:
-            csv_data.append(
-                {
-                    "file_path": str(r.file_path),
-                    "template_type": r.template_type or "",
-                    "is_valid": r.is_valid,
-                    "missing_fields": "; ".join(r.missing_fields),
-                    "invalid_fields": "; ".join(
-                        [f"{k}: {v}" for k, v in r.invalid_fields.items()]
-                    ),
-                    "warnings": "; ".join(r.warnings),
-                    "suggested_fixes_count": len(r.suggested_fixes),
-                }
-            )
+            csv_data.append({
+                "file_path": str(r.file_path),
+                "template_type": r.template_type or "",
+                "is_valid": r.is_valid,
+                "missing_fields": "; ".join(r.missing_fields),
+                "invalid_fields": "; ".join([
+                    f"{k}: {v}" for k, v in r.invalid_fields.items()
+                ]),
+                "warnings": "; ".join(r.warnings),
+                "suggested_fixes_count": len(r.suggested_fixes),
+            })
 
         if output_file:
             with output_file.open("w", newline="", encoding="utf-8") as f:
