@@ -76,7 +76,7 @@
         - Implement automatic date and metadata population
         - _Requirements: 8.1, 8.2, 8.4_
 
-    - [ ] 4.3 Create organize CLI command
+    - [x] 4.3 Create organize CLI command
         - Implement CLI command for automatic organization
         - Add dry-run mode with detailed preview of changes
         - Support selective application of improvements

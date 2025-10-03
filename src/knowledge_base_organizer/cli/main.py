@@ -383,17 +383,19 @@ def _output_validation_results(
         # Prepare CSV output
         csv_data = []
         for r in result.results:
-            csv_data.append({
-                "file_path": str(r.file_path),
-                "template_type": r.template_type or "",
-                "is_valid": r.is_valid,
-                "missing_fields": "; ".join(r.missing_fields),
-                "invalid_fields": "; ".join([
-                    f"{k}: {v}" for k, v in r.invalid_fields.items()
-                ]),
-                "warnings": "; ".join(r.warnings),
-                "suggested_fixes_count": len(r.suggested_fixes),
-            })
+            csv_data.append(
+                {
+                    "file_path": str(r.file_path),
+                    "template_type": r.template_type or "",
+                    "is_valid": r.is_valid,
+                    "missing_fields": "; ".join(r.missing_fields),
+                    "invalid_fields": "; ".join(
+                        [f"{k}: {v}" for k, v in r.invalid_fields.items()]
+                    ),
+                    "warnings": "; ".join(r.warnings),
+                    "suggested_fixes_count": len(r.suggested_fixes),
+                }
+            )
 
         if output_file:
             with output_file.open("w", newline="", encoding="utf-8") as f:
@@ -498,6 +500,58 @@ def _display_single_file_result(validation_result, console: Console) -> None:
         console.print("    Warnings:")
         for warning in validation_result.warnings:
             console.print(f"      {warning}")
+
+
+@app.command()
+def organize(
+    vault_path: Path = typer.Argument(..., help="Path to Obsidian vault"),
+    dry_run: bool = typer.Option(
+        True, "--dry-run/--execute", help="Preview changes without applying them"
+    ),
+    interactive: bool = typer.Option(
+        False, "--interactive", "-i", help="Interactive mode for reviewing improvements"
+    ),
+    output_format: str = typer.Option(
+        "console", "--format", help="Output format (console, json)"
+    ),
+    include_patterns: list[str] | None = typer.Option(
+        None, "--include", help="Include file patterns"
+    ),
+    exclude_patterns: list[str] | None = typer.Option(
+        None, "--exclude", help="Exclude file patterns"
+    ),
+    output_file: Path | None = typer.Option(
+        None, "--output", "-o", help="Output file for results"
+    ),
+    max_improvements: int = typer.Option(
+        50, "--max-improvements", help="Maximum improvements per file"
+    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
+) -> None:
+    """Automatically organize and improve knowledge base quality.
+
+    This command analyzes your vault and applies intelligent improvements including:
+    - Automatic frontmatter field completion
+    - Intelligent tag suggestions based on content
+    - Metadata extraction and population
+    - Consistency fixes and normalization
+
+    Use --dry-run to preview changes before applying them.
+    Use --interactive to review each improvement before applying.
+    """
+    from .organize_command import organize_command
+
+    organize_command(
+        vault_path=vault_path,
+        dry_run=dry_run,
+        interactive=interactive,
+        output_format=output_format,
+        include_patterns=include_patterns,
+        exclude_patterns=exclude_patterns,
+        output_file=output_file,
+        max_improvements=max_improvements,
+        verbose=verbose,
+    )
 
 
 def main() -> None:
