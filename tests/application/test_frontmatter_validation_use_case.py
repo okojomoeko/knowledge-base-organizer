@@ -9,6 +9,9 @@ from src.knowledge_base_organizer.application.frontmatter_validation_use_case im
     FrontmatterValidationRequest,
     FrontmatterValidationUseCase,
 )
+from src.knowledge_base_organizer.domain.services.frontmatter_validation_service import (
+    FrontmatterValidationService,
+)
 from src.knowledge_base_organizer.infrastructure.config import ProcessingConfig
 from src.knowledge_base_organizer.infrastructure.file_repository import FileRepository
 from src.knowledge_base_organizer.infrastructure.template_schema_repository import (
@@ -108,8 +111,9 @@ This note has type errors.
         """Create frontmatter validation use case."""
         file_repository = FileRepository(config)
         template_schema_repository = TemplateSchemaRepository(temp_vault, config)
+        validation_service = FrontmatterValidationService()
         return FrontmatterValidationUseCase(
-            file_repository, template_schema_repository, config
+            file_repository, template_schema_repository, validation_service, config
         )
 
     def test_execute_validation_success(self, use_case, temp_vault):
@@ -165,8 +169,9 @@ title: Test
 
             file_repository = FileRepository(config)
             template_schema_repository = TemplateSchemaRepository(vault_path, config)
+            validation_service = FrontmatterValidationService()
             use_case = FrontmatterValidationUseCase(
-                file_repository, template_schema_repository, config
+                file_repository, template_schema_repository, validation_service, config
             )
 
             request = FrontmatterValidationRequest(
@@ -198,8 +203,9 @@ title: Test
 
             file_repository = FileRepository(config)
             template_schema_repository = TemplateSchemaRepository(vault_path, config)
+            validation_service = FrontmatterValidationService()
             use_case = FrontmatterValidationUseCase(
-                file_repository, template_schema_repository, config
+                file_repository, template_schema_repository, validation_service, config
             )
 
             request = FrontmatterValidationRequest(

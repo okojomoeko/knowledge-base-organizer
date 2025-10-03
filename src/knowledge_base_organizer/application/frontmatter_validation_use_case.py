@@ -6,6 +6,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from ..domain.models import ValidationResult
+from ..domain.services import FrontmatterValidationService
 from ..infrastructure.config import ProcessingConfig
 from ..infrastructure.file_repository import FileRepository
 from ..infrastructure.template_schema_repository import TemplateSchemaRepository
@@ -50,11 +51,13 @@ class FrontmatterValidationUseCase:
         self,
         file_repository: FileRepository,
         template_schema_repository: TemplateSchemaRepository,
+        validation_service: FrontmatterValidationService,
         config: ProcessingConfig,
     ) -> None:
         """Initialize frontmatter validation use case."""
         self.file_repository = file_repository
         self.template_schema_repository = template_schema_repository
+        self.validation_service = validation_service
         self.config = config
 
     def execute(
@@ -110,14 +113,18 @@ class FrontmatterValidationUseCase:
             if template_type and template_type in schemas:
                 schema = schemas[template_type]
 
-                # Validate frontmatter against detected template schema
-                validation_result = schema.validate_frontmatter(file.frontmatter)
-                validation_result.file_path = file.path
-                validation_result.template_type = template_type
+                # Use enhanced validation service
+                validation_result = (
+                    self.validation_service.validate_with_detailed_analysis(
+                        file.frontmatter, schema, file.path
+                    )
+                )
 
                 # Apply fixes if not dry-run
                 if not request.dry_run and not validation_result.is_valid:
-                    fixes = schema.suggest_fixes(file.frontmatter)
+                    fixes = self.validation_service.generate_comprehensive_fixes(
+                        file.frontmatter, schema
+                    )
                     self._apply_fixes(file, fixes)
 
                 results.append(validation_result)

@@ -296,18 +296,22 @@ class TemplateSchemaRepository:
         except ValueError:
             return None
 
-        # Directory mappings
-        directory_mappings = {
-            "100_FleetingNotes": "new-fleeing-note",
-            "104_Books": "booksearchtemplate",
-            "Books": "booksearchtemplate",
-            "FleetingNotes": "new-fleeing-note",
-            "Notes": "new-fleeing-note",
-        }
+        # Use configuration-based directory mappings
+        directory_mappings = self.config.directory_template_mappings
 
+        # Check each path part against mappings
         for part in path_parts:
             if part in directory_mappings:
                 return directory_mappings[part]
+
+        # Check for partial matches (case-insensitive)
+        for part in path_parts:
+            for dir_pattern, template_name in directory_mappings.items():
+                if (
+                    part.lower() in dir_pattern.lower()
+                    or dir_pattern.lower() in part.lower()
+                ):
+                    return template_name
 
         return None
 
@@ -315,18 +319,45 @@ class TemplateSchemaRepository:
         """Detect template type based on frontmatter content."""
         frontmatter_dict = file.frontmatter.model_dump(exclude_unset=True)
 
-        # Book indicators
-        book_indicators = {"isbn13", "publisher", "author", "totalPage", "isbn"}
-        if any(field in frontmatter_dict for field in book_indicators):
-            return "booksearchtemplate"
+        # Enhanced content-based detection with scoring
+        template_scores = {}
 
-        # Note indicators
-        note_indicators = {"published", "category", "description"}
-        if any(field in frontmatter_dict for field in note_indicators):
-            return "new-fleeing-note"
+        # Book template indicators (strong indicators)
+        book_strong_indicators = {"isbn13", "isbn", "publisher", "totalPage"}
+        book_weak_indicators = {"author", "pages", "publication"}
+
+        book_score = 0
+        book_score += sum(
+            3 for field in book_strong_indicators if field in frontmatter_dict
+        )
+        book_score += sum(
+            1 for field in book_weak_indicators if field in frontmatter_dict
+        )
+
+        if book_score > 0:
+            template_scores["booksearchtemplate"] = book_score
+
+        # Note template indicators
+        note_strong_indicators = {"category", "description", "published"}
+        note_weak_indicators = {"summary", "notes", "content"}
+
+        note_score = 0
+        note_score += sum(
+            3 for field in note_strong_indicators if field in frontmatter_dict
+        )
+        note_score += sum(
+            1 for field in note_weak_indicators if field in frontmatter_dict
+        )
+
+        if note_score > 0:
+            template_scores["new-fleeing-note"] = note_score
+
+        # Return template with highest score
+        if template_scores:
+            return max(template_scores, key=template_scores.get)
 
         return None
 
     def _get_fallback_template(self) -> str | None:
         """Get fallback template when detection fails."""
-        return "new-fleeing-note"  # Default to fleeting note template
+        return self.config.fallback_template

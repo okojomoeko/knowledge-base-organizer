@@ -37,13 +37,13 @@
 ## Phase 2: Frontmatter Validation (Complete Feature)
 
 - [ ] 3. Implement template-based frontmatter validation
-    - [ ] 3.1 Create template schema extraction system
+    - [x] 3.1 Create template schema extraction system
         - Implement TemplateSchemaRepository to scan template directories
         - Parse frontmatter from template files (new-fleeing-note.md, booksearchtemplate.md)
         - Convert template variables to validation rules
         - _Requirements: 1.1, 6.2_
 
-    - [ ] 3.2 Implement frontmatter validation logic
+    - [x] 3.2 Implement frontmatter validation logic
         - Create FrontmatterSchema with validation methods
         - Add template type detection (directory-based and content-based)
         - Generate fix suggestions for non-conforming frontmatter
