@@ -22,7 +22,7 @@ class TestAnalyzeCommand:
         runner = CliRunner()
         vault_path = "tests/test-data/vaults/test-myvault"
 
-        result = runner.invoke(app, [vault_path, "--output-format", "json"])
+        result = runner.invoke(app, ["analyze", vault_path, "--output-format", "json"])
 
         # Should succeed despite warnings
         assert result.exit_code == 0
@@ -76,7 +76,9 @@ class TestAnalyzeCommand:
         runner = CliRunner()
         vault_path = "tests/test-data/vaults/test-myvault"
 
-        result = runner.invoke(app, [vault_path, "--output-format", "console"])
+        result = runner.invoke(
+            app, ["analyze", vault_path, "--output-format", "console"]
+        )
 
         # Should succeed despite warnings
         assert result.exit_code == 0
@@ -93,7 +95,7 @@ class TestAnalyzeCommand:
         runner = CliRunner()
         vault_path = "nonexistent/vault/path"
 
-        result = runner.invoke(app, [vault_path])
+        result = runner.invoke(app, ["analyze", vault_path])
 
         # Should fail with exit code 1
         assert result.exit_code == 1
@@ -105,7 +107,7 @@ class TestAnalyzeCommand:
         vault_path = "tests/test-data/vaults/test-myvault"
 
         result = runner.invoke(
-            app, [vault_path, "--include", "*.md", "--output-format", "json"]
+            app, ["analyze", vault_path, "--include", "*.md", "--output-format", "json"]
         )
 
         # Should succeed
@@ -119,6 +121,7 @@ class TestAnalyzeCommand:
         result = runner.invoke(
             app,
             [
+                "analyze",
                 vault_path,
                 "--exclude",
                 "template*",
@@ -136,7 +139,7 @@ class TestAnalyzeCommand:
         vault_path = "tests/test-data/vaults/test-myvault"
 
         result = runner.invoke(
-            app, [vault_path, "--verbose", "--output-format", "console"]
+            app, ["analyze", vault_path, "--verbose", "--output-format", "console"]
         )
 
         # Should succeed and show verbose output

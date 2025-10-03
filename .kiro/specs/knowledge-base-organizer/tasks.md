@@ -49,7 +49,7 @@
         - Generate fix suggestions for non-conforming frontmatter
         - _Requirements: 1.3, 1.4, 1.5_
 
-    - [ ] 3.3 Create validate-frontmatter CLI command
+    - [x] 3.3 Create validate-frontmatter CLI command
         - Implement complete CLI command with dry-run and execute modes
         - Add interactive mode for reviewing and applying fixes
         - Support CSV/JSON output for automation
