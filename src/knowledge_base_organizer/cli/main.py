@@ -11,6 +11,10 @@ import typer
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
+from knowledge_base_organizer.application.dead_link_detection_use_case import (
+    DeadLinkDetectionRequest,
+    DeadLinkDetectionUseCase,
+)
 from knowledge_base_organizer.application.frontmatter_validation_use_case import (
     FrontmatterValidationRequest,
     FrontmatterValidationUseCase,
@@ -18,6 +22,9 @@ from knowledge_base_organizer.application.frontmatter_validation_use_case import
 from knowledge_base_organizer.application.vault_analyzer import VaultAnalyzer
 from knowledge_base_organizer.domain.services.frontmatter_validation_service import (
     FrontmatterValidationService,
+)
+from knowledge_base_organizer.domain.services.link_analysis_service import (
+    LinkAnalysisService,
 )
 from knowledge_base_organizer.infrastructure.config import (
     OutputFormat,
@@ -269,15 +276,103 @@ def validate_frontmatter(
         console.print(f"[dim]Invalid files: {result.invalid_files}[/dim]")
 
 
+@app.command()
+def detect_dead_links(
+    vault_path: Path = typer.Argument(..., help="Path to Obsidian vault"),
+    output_format: str = typer.Option(
+        OutputFormat.CONSOLE, help="Output format (json, csv, console)"
+    ),
+    include_patterns: list[str] | None = typer.Option(
+        None, "--include", help="Include file patterns"
+    ),
+    exclude_patterns: list[str] | None = typer.Option(
+        None, "--exclude", help="Exclude file patterns"
+    ),
+    check_external_links: bool = typer.Option(
+        False, "--check-external", help="Check external links (not implemented yet)"
+    ),
+    output_file: Path | None = typer.Option(
+        None, "--output", "-o", help="Output file for CSV/JSON results"
+    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
+) -> None:
+    """Detect and report dead WikiLinks and regular links.
+
+    This command scans all markdown files in the vault and identifies:
+    - WikiLinks pointing to non-existent files
+    - Regular markdown links with empty or invalid targets
+    - Link Reference Definitions with empty paths
+
+    Results can be output in JSON, CSV, or console format for further processing.
+    """
+    if verbose:
+        console.print(f"[bold blue]Detecting dead links in:[/bold blue] {vault_path}")
+
+    # Validate vault path
+    if not vault_path.exists():
+        console.print(f"[red]✗[/red] Vault path does not exist: {vault_path}")
+        raise typer.Exit(1)
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Loading configuration...", total=None)
+
+        # Load configuration
+        config = ProcessingConfig.get_default_config()
+        if include_patterns:
+            config.include_patterns = include_patterns
+        if exclude_patterns:
+            config.exclude_patterns.extend(exclude_patterns)
+
+        # Initialize components
+
+        file_repository = FileRepository(config)
+        link_analysis_service = LinkAnalysisService()
+
+        use_case = DeadLinkDetectionUseCase(
+            file_repository=file_repository,
+            link_analysis_service=link_analysis_service,
+            config=config,
+        )
+
+        progress.update(task, description="Scanning files for dead links...")
+
+        # Create request
+        request = DeadLinkDetectionRequest(
+            vault_path=vault_path,
+            include_patterns=include_patterns,
+            exclude_patterns=exclude_patterns,
+            check_external_links=check_external_links,
+        )
+
+        try:
+            result = use_case.execute(request)
+            progress.update(task, description="Dead link detection complete!")
+
+        except Exception as e:
+            progress.update(task, description="Dead link detection failed!")
+            console.print(f"[red]✗[/red] Error during dead link detection: {e}")
+            if verbose:
+                console.print(f"[dim]{traceback.format_exc()}[/dim]")
+            raise typer.Exit(1) from e
+
+    # Output results
+    _output_dead_link_results(result, output_format, output_file, console, verbose)
+
+    # Final summary
+    if verbose:
+        console.print("[green]✓[/green] Dead link detection completed")
+        console.print(f"[dim]Files scanned: {result.total_files_scanned}[/dim]")
+        console.print(f"[dim]Dead links found: {result.total_dead_links}[/dim]")
+
+
 # NOTE: Additional commands will be implemented in future versions
 # @app.command()
 # def auto_link(...) -> None:
 #     """Generate WikiLinks from plain text with Japanese synonym detection."""
-#     pass
-
-# @app.command()
-# def detect_dead_links(...) -> None:
-#     """Detect and report dead WikiLinks and regular links."""
 #     pass
 
 # @app.command()
@@ -498,6 +593,143 @@ def _display_single_file_result(validation_result, console: Console) -> None:
         console.print("    Warnings:")
         for warning in validation_result.warnings:
             console.print(f"      {warning}")
+
+
+def _output_dead_link_results(
+    result,
+    output_format: str,
+    output_file: Path | None,
+    console: Console,
+    verbose: bool,
+) -> None:
+    """Output dead link detection results in the specified format."""
+
+    if output_format.lower() == OutputFormat.JSON.lower():
+        # Prepare JSON output
+        json_data = {
+            "detection_timestamp": datetime.now().isoformat(),
+            "vault_path": result.vault_path,
+            "summary": result.summary,
+            "total_files_scanned": result.total_files_scanned,
+            "files_with_dead_links": result.files_with_dead_links,
+            "total_dead_links": result.total_dead_links,
+            "dead_links_by_type": result.dead_links_by_type,
+            "dead_links": [
+                {
+                    "source_file": dl.source_file,
+                    "link_text": dl.link_text,
+                    "link_type": dl.link_type,
+                    "line_number": dl.line_number,
+                    "target": dl.target,
+                    "suggested_fixes": dl.suggested_fixes,
+                }
+                for dl in result.dead_links
+            ],
+        }
+
+        if output_file:
+            with output_file.open("w", encoding="utf-8") as f:
+                json.dump(json_data, f, indent=2, ensure_ascii=False)
+            console.print(f"[green]✓[/green] JSON results saved to: {output_file}")
+        else:
+            console.print(json.dumps(json_data, indent=2, ensure_ascii=False))
+
+    elif output_format.lower() == OutputFormat.CSV.lower():
+        # Prepare CSV output
+        csv_data = []
+        for dl in result.dead_links:
+            csv_data.append({
+                "source_file": dl.source_file,
+                "link_text": dl.link_text,
+                "link_type": dl.link_type,
+                "line_number": dl.line_number,
+                "target": dl.target,
+                "suggested_fixes": "; ".join(dl.suggested_fixes),
+            })
+
+        if output_file:
+            with output_file.open("w", newline="", encoding="utf-8") as f:
+                if csv_data:
+                    writer = csv.DictWriter(f, fieldnames=csv_data[0].keys())
+                    writer.writeheader()
+                    writer.writerows(csv_data)
+            console.print(f"[green]✓[/green] CSV results saved to: {output_file}")
+        # Output CSV to console
+        elif csv_data:
+            output = io.StringIO()
+            writer = csv.DictWriter(output, fieldnames=csv_data[0].keys())
+            writer.writeheader()
+            writer.writerows(csv_data)
+            console.print(output.getvalue())
+
+    else:
+        # Console format (default)
+        _display_dead_link_console(result, console, verbose)
+
+
+def _display_dead_link_console(result, console: Console, verbose: bool) -> None:
+    """Display dead link detection results in console format."""
+    console.print("\n[bold blue]🔗 Dead Link Detection Results[/bold blue]")
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    console.print(f"[dim]Detection completed at: {timestamp}[/dim]")
+    console.print(f"[dim]Vault: {result.vault_path}[/dim]\n")
+
+    # Summary statistics
+    console.print("[bold green]📊 Summary[/bold green]")
+    console.print(f"  Files scanned: {result.total_files_scanned}")
+    console.print(f"  Files with dead links: [red]{result.files_with_dead_links}[/red]")
+    console.print(f"  Total dead links: [red]{result.total_dead_links}[/red]")
+
+    if result.total_dead_links == 0:
+        console.print("\n[green]✓ No dead links found! Your vault is healthy.[/green]")
+        return
+
+    # Dead links by type
+    console.print("\n[bold yellow]🔍 Dead Links by Type[/bold yellow]")
+    for link_type, count in result.dead_links_by_type.items():
+        type_display = {
+            "wikilink": "WikiLinks",
+            "regular_link": "Regular Links",
+            "link_ref_def": "Link Reference Definitions",
+        }.get(link_type, link_type)
+        console.print(f"  {type_display}: [red]{count}[/red]")
+
+    # Detailed results
+    if verbose or result.total_dead_links <= 20:
+        console.print("\n[bold red]❌ Dead Links Found[/bold red]")
+
+        # Group by source file for better readability
+        dead_links_by_file = {}
+        for dl in result.dead_links:
+            if dl.source_file not in dead_links_by_file:
+                dead_links_by_file[dl.source_file] = []
+            dead_links_by_file[dl.source_file].append(dl)
+
+        for source_file, dead_links in dead_links_by_file.items():
+            file_name = Path(source_file).name
+            console.print(
+                f"\n  [blue]📄 {file_name}[/blue] ({len(dead_links)} dead links)"
+            )
+
+            for dl in dead_links:
+                type_icon = {
+                    "wikilink": "🔗",
+                    "regular_link": "🌐",
+                    "link_ref_def": "📎",
+                }.get(dl.link_type, "❓")
+
+                console.print(f"    {type_icon} Line {dl.line_number}: {dl.link_text}")
+                console.print(f"      [dim]Target: {dl.target or '(empty)'}[/dim]")
+
+                if dl.suggested_fixes:
+                    console.print("      [yellow]Suggestions:[/yellow]")
+                    for fix in dl.suggested_fixes:
+                        console.print(f"        • {fix}")
+    else:
+        console.print(
+            f"\n[dim]Use --verbose to see detailed results for all "
+            f"{result.total_dead_links} dead links[/dim]"
+        )
 
 
 @app.command()
