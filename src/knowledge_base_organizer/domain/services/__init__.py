@@ -1,6 +1,11 @@
 """Domain services for knowledge base organizer."""
 
+from .content_processing_service import ContentProcessingService
 from .frontmatter_validation_service import FrontmatterValidationService
 from .link_analysis_service import LinkAnalysisService
 
-__all__ = ["FrontmatterValidationService", "LinkAnalysisService"]
+__all__ = [
+    "ContentProcessingService",
+    "FrontmatterValidationService",
+    "LinkAnalysisService",
+]
