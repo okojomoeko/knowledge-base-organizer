@@ -19,7 +19,7 @@ class TextRange(BaseModel):
     start_column: int
     end_line: int
     end_column: int
-    zone_type: str  # "frontmatter", "wikilink", "regular_link", "link_ref_def", "table"
+    zone_type: str  # "frontmatter", "wikilink", "regular_link", "link_ref_def", "table", "template_variable"
 
 
 class LinkCandidate(BaseModel):
@@ -181,6 +181,27 @@ class LinkAnalysisService:
                         zone_type="table",
                     )
                 )
+
+            # Detect template variables and template blocks
+            # Template variables: ${...}, {{...}}, <% ... %>
+            template_patterns = [
+                re.compile(r"\$\{[^}]*\}"),  # ${variable}
+                re.compile(r"\{\{[^}]*\}\}"),  # {{variable}}
+                re.compile(r"<%[^%]*%>"),  # <% template %>
+                re.compile(r"<%\*[^*]*\*%>"),  # <%* template *%>
+            ]
+
+            for pattern in template_patterns:
+                for match in pattern.finditer(line):
+                    exclusion_zones.append(
+                        TextRange(
+                            start_line=line_num,
+                            start_column=match.start(),
+                            end_line=line_num,
+                            end_column=match.end(),
+                            zone_type="template_variable",
+                        )
+                    )
 
         return exclusion_zones
 

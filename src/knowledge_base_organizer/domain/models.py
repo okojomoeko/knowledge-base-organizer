@@ -114,7 +114,7 @@ class MarkdownFile(BaseModel):
         return None
 
     def extract_links(self) -> None:
-        """Extract all types of links from the content."""
+        """Extract all types of links from the content, excluding template variables."""
         # Clear existing links
         self.wiki_links.clear()
         self.regular_links.clear()
@@ -122,10 +122,23 @@ class MarkdownFile(BaseModel):
 
         lines = self.content.split("\n")
 
+        # Get exclusion zones for template variables
+        exclusion_zones = self._get_template_exclusion_zones()
+
         for line_num, line in enumerate(lines, 1):
             # Extract WikiLinks: [[id]] or [[id|alias]]
             wiki_pattern = re.compile(r"\[\[([^|\]]+)(?:\|([^\]]+))?\]\]")
             for match in wiki_pattern.finditer(line):
+                # Check if this WikiLink is in a template variable exclusion zone
+                position = TextPosition(
+                    line_number=line_num,
+                    column_start=match.start(),
+                    column_end=match.end(),
+                )
+
+                if self._is_in_exclusion_zone(position, exclusion_zones):
+                    continue  # Skip this WikiLink as it's in a template variable
+
                 target_id = match.group(1).strip()
                 alias = match.group(2).strip() if match.group(2) else None
                 wiki_link = WikiLink(
@@ -218,6 +231,64 @@ class MarkdownFile(BaseModel):
             return isinstance(value, (int, float))
 
         return True  # Unknown type, assume valid
+
+    def _get_template_exclusion_zones(self) -> list["TextRange"]:
+        """Get exclusion zones for template variables and template blocks."""
+        from .services.link_analysis_service import TextRange
+
+        exclusion_zones = []
+        lines = self.content.split("\n")
+
+        for line_num, line in enumerate(lines, 1):
+            # Detect template variables and template blocks
+            # Template variables: ${...}, {{...}}, <% ... %>
+            template_patterns = [
+                re.compile(r"\$\{[^}]*\}"),  # ${variable}
+                re.compile(r"\{\{[^}]*\}\}"),  # {{variable}}
+                re.compile(r"<%[^%]*%>"),  # <% template %>
+                re.compile(r"<%\*[^*]*\*%>"),  # <%* template *%>
+            ]
+
+            for pattern in template_patterns:
+                for match in pattern.finditer(line):
+                    exclusion_zones.append(
+                        TextRange(
+                            start_line=line_num,
+                            start_column=match.start(),
+                            end_line=line_num,
+                            end_column=match.end(),
+                            zone_type="template_variable",
+                        )
+                    )
+
+        return exclusion_zones
+
+    def _is_in_exclusion_zone(
+        self, position: "TextPosition", exclusion_zones: list["TextRange"]
+    ) -> bool:
+        """Check if a position falls within any exclusion zone."""
+        for zone in exclusion_zones:
+            # Check if position is within the zone
+            if zone.start_line <= position.line_number <= zone.end_line:
+                # If it's a single line zone, check column positions
+                if zone.start_line == zone.end_line:
+                    if zone.start_column <= position.column_start < zone.end_column:
+                        return True
+                # If it's a multi-line zone
+                elif (
+                    (
+                        position.line_number == zone.start_line
+                        and position.column_start >= zone.start_column
+                    )
+                    or (
+                        position.line_number == zone.end_line
+                        and position.column_start < zone.end_column
+                    )
+                    or (zone.start_line < position.line_number < zone.end_line)
+                ):
+                    return True
+
+        return False
 
     def add_wiki_link(self, target_id: str, alias: str | None = None) -> None:
         """Add a new WikiLink to the content."""

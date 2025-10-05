@@ -136,7 +136,7 @@
         - Support filtering and sorting of results
         - _Requirements: 3.4, 3.6, 5.1, 5.4_
 
-    - [ ] 6.4 Test link detection with real data
+    - [x] 6.4 Test link detection with real data
         - Test with test-myvault to find actual dead links
         - Verify exclusion zones work correctly
         - Test performance with large numbers of files
