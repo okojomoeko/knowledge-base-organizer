@@ -178,3 +178,11 @@ myvault_backups/
 myvault
 
 .DS_Store
+
+# Test output files (should be in appropriate directories)
+/dead_links_test.*
+/filtered_dead_links.*
+/test_output.*
+
+# Experiment results are kept for reference
+# experiments/experiment_results/ is tracked

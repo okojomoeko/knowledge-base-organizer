@@ -1,0 +1,44 @@
+{
+  "detection_timestamp": "2025-10-04T10:17:00.206730",
+  "vault_path": "tests/test-data/vaults/test-myvault",
+  "summary": {
+    "total_files": 15,
+    "files_with_dead_links": 1,
+    "total_dead_links": 2,
+    "wikilink_dead_links": 2,
+    "regular_link_dead_links": 0,
+    "link_ref_def_dead_links": 0,
+    "vault_path": "tests/test-data/vaults/test-myvault"
+  },
+  "total_files_scanned": 15,
+  "files_with_dead_links": 1,
+  "total_dead_links": 2,
+  "dead_links_by_type": {
+    "wikilink": 2
+  },
+  "dead_links": [
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[20230816202421|CloudWatch Logs]]",
+      "link_type": "wikilink",
+      "line_number": 7,
+      "target": "20230816202421",
+      "suggested_fixes": [
+        "Did you mean '20230624175527'?",
+        "Did you mean '20230624195203'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[20240314205715|CloudWatch Events]]",
+      "link_type": "wikilink",
+      "line_number": 8,
+      "target": "20240314205715",
+      "suggested_fixes": [
+        "Did you mean '20240422225316'?",
+        "Did you mean '20241116105142'?",
+        "Did you mean '20240227205734'?"
+      ]
+    }
+  ]
+}

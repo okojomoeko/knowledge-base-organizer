@@ -26,4 +26,7 @@
   },
   "editor.defaultFormatter": "charliermarsh.ruff",
   "python.defaultInterpreterPath": ".venv/bin/python",
+  "[json]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
+  },
 }

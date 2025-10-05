@@ -1,0 +1,505 @@
+{
+  "detection_timestamp": "2025-10-04T10:11:21.755451",
+  "vault_path": "tests/test-data/vaults/test-myvault",
+  "summary": {
+    "total_files": 15,
+    "files_with_dead_links": 5,
+    "total_dead_links": 51,
+    "wikilink_dead_links": 51,
+    "regular_link_dead_links": 0,
+    "link_ref_def_dead_links": 0,
+    "vault_path": "tests/test-data/vaults/test-myvault"
+  },
+  "total_files_scanned": 15,
+  "files_with_dead_links": 5,
+  "total_dead_links": 51,
+  "dead_links_by_type": {
+    "wikilink": 51
+  },
+  "dead_links": [
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[20230816202421|CloudWatch Logs]]",
+      "link_type": "wikilink",
+      "line_number": 7,
+      "target": "20230816202421",
+      "suggested_fixes": [
+        "Did you mean '20230624175527'?",
+        "Did you mean '20230624195203'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[20240314205715|CloudWatch Events]]",
+      "link_type": "wikilink",
+      "line_number": 8,
+      "target": "20240314205715",
+      "suggested_fixes": [
+        "Did you mean '20240422225316'?",
+        "Did you mean '20241116105142'?",
+        "Did you mean '20240227205734'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[CloudWatch Alarms]]",
+      "link_type": "wikilink",
+      "line_number": 9,
+      "target": "CloudWatch Alarms",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[CloudWatch Logs Insights]]",
+      "link_type": "wikilink",
+      "line_number": 10,
+      "target": "CloudWatch Logs Insights",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[CloudWatch Dashboards]]",
+      "link_type": "wikilink",
+      "line_number": 11,
+      "target": "CloudWatch Dashboards",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[CloudWatch Alarms]]",
+      "link_type": "wikilink",
+      "line_number": 13,
+      "target": "CloudWatch Alarms",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[機械学習]]",
+      "link_type": "wikilink",
+      "line_number": 16,
+      "target": "機械学習",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[20230816200310|EventBridge]]",
+      "link_type": "wikilink",
+      "line_number": 17,
+      "target": "20230816200310",
+      "suggested_fixes": [
+        "Did you mean '20230624175527'?",
+        "Did you mean '20230624195203'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[20230816200310|EventBridge]]",
+      "link_type": "wikilink",
+      "line_number": 18,
+      "target": "20230816200310",
+      "suggested_fixes": [
+        "Did you mean '20230624175527'?",
+        "Did you mean '20230624195203'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[20230805235856|Lambda]]",
+      "link_type": "wikilink",
+      "line_number": 19,
+      "target": "20230805235856",
+      "suggested_fixes": [
+        "Did you mean '20230624175527'?",
+        "Did you mean '20230624195203'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[複合アラーム(Composite Alarm)]]",
+      "link_type": "wikilink",
+      "line_number": 20,
+      "target": "複合アラーム(Composite Alarm)",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[20230727234718|EC2]]",
+      "link_type": "wikilink",
+      "line_number": 28,
+      "target": "20230727234718",
+      "suggested_fixes": [
+        "Did you mean '20230624175527'?",
+        "Did you mean '20230624195203'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[メトリクス]]",
+      "link_type": "wikilink",
+      "line_number": 32,
+      "target": "メトリクス",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[20230727234718|EC2]]",
+      "link_type": "wikilink",
+      "line_number": 34,
+      "target": "20230727234718",
+      "suggested_fixes": [
+        "Did you mean '20230624175527'?",
+        "Did you mean '20230624195203'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[20230730201034|ELB]]",
+      "link_type": "wikilink",
+      "line_number": 34,
+      "target": "20230730201034",
+      "suggested_fixes": [
+        "Did you mean '20230624175527'?",
+        "Did you mean '20230624195203'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[20230802000730|RDS]]",
+      "link_type": "wikilink",
+      "line_number": 34,
+      "target": "20230802000730",
+      "suggested_fixes": [
+        "Did you mean '20230624175527'?",
+        "Did you mean '20230624195203'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[3層構造]]",
+      "link_type": "wikilink",
+      "line_number": 34,
+      "target": "3層構造",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[20230730201034|ELB]]",
+      "link_type": "wikilink",
+      "line_number": 36,
+      "target": "20230730201034",
+      "suggested_fixes": [
+        "Did you mean '20230624175527'?",
+        "Did you mean '20230624195203'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[リージョン]]",
+      "link_type": "wikilink",
+      "line_number": 46,
+      "target": "リージョン",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[20240227235831|EC2インスタンス]]",
+      "link_type": "wikilink",
+      "line_number": 48,
+      "target": "20240227235831",
+      "suggested_fixes": [
+        "Did you mean '20240422225316'?",
+        "Did you mean '20241116105142'?",
+        "Did you mean '20240227205734'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[CloudWatch Agent]]",
+      "link_type": "wikilink",
+      "line_number": 48,
+      "target": "CloudWatch Agent",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[CloudWatch Agent]]",
+      "link_type": "wikilink",
+      "line_number": 49,
+      "target": "CloudWatch Agent",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[メトリクス]]",
+      "link_type": "wikilink",
+      "line_number": 56,
+      "target": "メトリクス",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[20230709211042|AWS Organizations]]",
+      "link_type": "wikilink",
+      "line_number": 58,
+      "target": "20230709211042",
+      "suggested_fixes": [
+        "Did you mean '20230624175527'?",
+        "Did you mean '20230624195203'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[OU]]",
+      "link_type": "wikilink",
+      "line_number": 58,
+      "target": "OU",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[20230816170731|CloudFormation]]",
+      "link_type": "wikilink",
+      "line_number": 65,
+      "target": "20230816170731",
+      "suggested_fixes": [
+        "Did you mean '20230624175527'?",
+        "Did you mean '20230624195203'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[メトリクス]]",
+      "link_type": "wikilink",
+      "line_number": 73,
+      "target": "メトリクス",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[メトリクス]]",
+      "link_type": "wikilink",
+      "line_number": 74,
+      "target": "メトリクス",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[CloudWatch Agent]]",
+      "link_type": "wikilink",
+      "line_number": 75,
+      "target": "CloudWatch Agent",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[20240227235831|EC2インスタンス]]",
+      "link_type": "wikilink",
+      "line_number": 77,
+      "target": "20240227235831",
+      "suggested_fixes": [
+        "Did you mean '20240422225316'?",
+        "Did you mean '20241116105142'?",
+        "Did you mean '20240227205734'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[メトリクス]]",
+      "link_type": "wikilink",
+      "line_number": 77,
+      "target": "メトリクス",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[20240227235831|EC2インスタンス]]",
+      "link_type": "wikilink",
+      "line_number": 84,
+      "target": "20240227235831",
+      "suggested_fixes": [
+        "Did you mean '20240422225316'?",
+        "Did you mean '20241116105142'?",
+        "Did you mean '20240227205734'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[20240227235831|EC2インスタンス]]",
+      "link_type": "wikilink",
+      "line_number": 84,
+      "target": "20240227235831",
+      "suggested_fixes": [
+        "Did you mean '20240422225316'?",
+        "Did you mean '20241116105142'?",
+        "Did you mean '20240227205734'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20230624175527.md",
+      "link_text": "[[20240227235831|EC2インスタンス]]",
+      "link_type": "wikilink",
+      "line_number": 86,
+      "target": "20240227235831",
+      "suggested_fixes": [
+        "Did you mean '20240422225316'?",
+        "Did you mean '20241116105142'?",
+        "Did you mean '20240227205734'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20240422225316.md",
+      "link_text": "[[SSL/TLS]]",
+      "link_type": "wikilink",
+      "line_number": 3,
+      "target": "SSL/TLS",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20240422225316.md",
+      "link_text": "[[証明書]]",
+      "link_type": "wikilink",
+      "line_number": 3,
+      "target": "証明書",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20240422225316.md",
+      "link_text": "[[証明書]]",
+      "link_type": "wikilink",
+      "line_number": 3,
+      "target": "証明書",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20240422225316.md",
+      "link_text": "[[SSL/TLS]]",
+      "link_type": "wikilink",
+      "line_number": 4,
+      "target": "SSL/TLS",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20240422225316.md",
+      "link_text": "[[証明書]]",
+      "link_type": "wikilink",
+      "line_number": 4,
+      "target": "証明書",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20240422225316.md",
+      "link_text": "[[ドメイン]]",
+      "link_type": "wikilink",
+      "line_number": 4,
+      "target": "ドメイン",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20241116105142.md",
+      "link_text": "[[20240825164925|EMRFS]]",
+      "link_type": "wikilink",
+      "line_number": 4,
+      "target": "20240825164925",
+      "suggested_fixes": [
+        "Did you mean '20240422225316'?",
+        "Did you mean '20241116105142'?",
+        "Did you mean '20240227205734'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20241116105142.md",
+      "link_text": "[[20230731234309|S3]]",
+      "link_type": "wikilink",
+      "line_number": 4,
+      "target": "20230731234309",
+      "suggested_fixes": [
+        "Did you mean '20230624175527'?",
+        "Did you mean '20230624195203'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20241116105142.md",
+      "link_text": "[[20230727010640|DynamoDB]]",
+      "link_type": "wikilink",
+      "line_number": 5,
+      "target": "20230727010640",
+      "suggested_fixes": [
+        "Did you mean '20230624175527'?",
+        "Did you mean '20230624195203'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20241116105142.md",
+      "link_text": "[[20230731234309|S3]]",
+      "link_type": "wikilink",
+      "line_number": 5,
+      "target": "20230731234309",
+      "suggested_fixes": [
+        "Did you mean '20230624175527'?",
+        "Did you mean '20230624195203'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20241116105142.md",
+      "link_text": "[[20230808222507|EMR]]",
+      "link_type": "wikilink",
+      "line_number": 5,
+      "target": "20230808222507",
+      "suggested_fixes": [
+        "Did you mean '20230624175527'?",
+        "Did you mean '20230624195203'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/101_PermanentNotes/20241116105142.md",
+      "link_text": "[[20230731234309|S3]]",
+      "link_type": "wikilink",
+      "line_number": 5,
+      "target": "20230731234309",
+      "suggested_fixes": [
+        "Did you mean '20230624175527'?",
+        "Did you mean '20230624195203'?"
+      ]
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/903_BookSearchTemplates/booksearchtemplate.md",
+      "link_text": "[[${tp.frontmatter.localCover}|150]]",
+      "link_type": "wikilink",
+      "line_number": 3,
+      "target": "${tp.frontmatter.localCover}",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/100_FleetingNotes/20250310103733.md",
+      "link_text": "[[MySQL]]",
+      "link_type": "wikilink",
+      "line_number": 3,
+      "target": "MySQL",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/100_FleetingNotes/20250310103733.md",
+      "link_text": "[[PostgreSQL]]",
+      "link_type": "wikilink",
+      "line_number": 4,
+      "target": "PostgreSQL",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/100_FleetingNotes/20250310103733.md",
+      "link_text": "[[Oracle Database]]",
+      "link_type": "wikilink",
+      "line_number": 5,
+      "target": "Oracle Database",
+      "suggested_fixes": []
+    },
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/100_FleetingNotes/20250310103733.md",
+      "link_text": "[[Microsoft SQL Server]]",
+      "link_type": "wikilink",
+      "line_number": 6,
+      "target": "Microsoft SQL Server",
+      "suggested_fixes": []
+    }
+  ]
+}

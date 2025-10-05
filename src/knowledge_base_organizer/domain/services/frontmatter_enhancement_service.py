@@ -732,9 +732,9 @@ class FrontmatterEnhancementService:
             "tag_coverage": {
                 "files_with_tags": analysis.total_files
                 - len([f for f in analysis.tag_frequency.values() if f == 0]),
-                "files_without_tags": len(
-                    [f for f in analysis.tag_frequency.values() if f == 0]
-                ),
+                "files_without_tags": len([
+                    f for f in analysis.tag_frequency.values() if f == 0
+                ]),
             },
         }
 

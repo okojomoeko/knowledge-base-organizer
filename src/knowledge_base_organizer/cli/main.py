@@ -1,5 +1,6 @@
 """Main CLI interface for knowledge base organizer."""
 
+import copy
 import csv
 import io
 import json
@@ -288,6 +289,22 @@ def detect_dead_links(
     exclude_patterns: list[str] | None = typer.Option(
         None, "--exclude", help="Exclude file patterns"
     ),
+    link_types: list[str] | None = typer.Option(
+        None,
+        "--link-type",
+        help="Filter by link type (wikilink, regular_link, link_ref_def)",
+    ),
+    sort_by: str = typer.Option(
+        "file", "--sort-by", help="Sort results by: file, line, type, target"
+    ),
+    limit: int | None = typer.Option(
+        None, "--limit", help="Limit number of dead links shown"
+    ),
+    only_with_suggestions: bool = typer.Option(
+        False,
+        "--only-with-suggestions",
+        help="Show only dead links that have fix suggestions",
+    ),
     check_external_links: bool = typer.Option(
         False, "--check-external", help="Check external links (not implemented yet)"
     ),
@@ -359,8 +376,15 @@ def detect_dead_links(
                 console.print(f"[dim]{traceback.format_exc()}[/dim]")
             raise typer.Exit(1) from e
 
+    # Apply filtering and sorting
+    filtered_result = _filter_and_sort_dead_links(
+        result, link_types, sort_by, limit, only_with_suggestions
+    )
+
     # Output results
-    _output_dead_link_results(result, output_format, output_file, console, verbose)
+    _output_dead_link_results(
+        filtered_result, output_format, output_file, console, verbose
+    )
 
     # Final summary
     if verbose:
@@ -593,6 +617,76 @@ def _display_single_file_result(validation_result, console: Console) -> None:
         console.print("    Warnings:")
         for warning in validation_result.warnings:
             console.print(f"      {warning}")
+
+
+def _filter_and_sort_dead_links(
+    result,
+    link_types: list[str] | None,
+    sort_by: str,
+    limit: int | None,
+    only_with_suggestions: bool,
+):
+    """Filter and sort dead link results based on user criteria."""
+
+    # Create a copy to avoid modifying the original result
+    filtered_result = copy.deepcopy(result)
+    dead_links = list(filtered_result.dead_links)
+
+    # Filter by link types
+    if link_types:
+        valid_types = {"wikilink", "regular_link", "link_ref_def"}
+        invalid_types = set(link_types) - valid_types
+        if invalid_types:
+            raise typer.BadParameter(
+                f"Invalid link types: {', '.join(invalid_types)}. "
+                f"Valid types are: {', '.join(valid_types)}"
+            )
+        dead_links = [dl for dl in dead_links if dl.link_type in link_types]
+
+    # Filter by suggestions
+    if only_with_suggestions:
+        dead_links = [dl for dl in dead_links if dl.suggested_fixes]
+
+    # Sort results
+    if sort_by in {"file", "line"}:
+        dead_links.sort(key=lambda dl: (dl.source_file, dl.line_number))
+    elif sort_by == "type":
+        dead_links.sort(key=lambda dl: (dl.link_type, dl.source_file, dl.line_number))
+    elif sort_by == "target":
+        dead_links.sort(key=lambda dl: (dl.target, dl.source_file, dl.line_number))
+    else:
+        raise typer.BadParameter(
+            f"Invalid sort option: {sort_by}. "
+            "Valid options are: file, line, type, target"
+        )
+
+    # Apply limit
+    if limit is not None and limit > 0:
+        dead_links = dead_links[:limit]
+
+    # Update the result with filtered and sorted data
+    filtered_result.dead_links = dead_links
+    filtered_result.total_dead_links = len(dead_links)
+
+    # Recalculate statistics
+    dead_links_by_type = {}
+    for dead_link in dead_links:
+        link_type = dead_link.link_type
+        dead_links_by_type[link_type] = dead_links_by_type.get(link_type, 0) + 1
+
+    filtered_result.dead_links_by_type = dead_links_by_type
+    filtered_result.files_with_dead_links = len({dl.source_file for dl in dead_links})
+
+    # Update summary
+    filtered_result.summary.update({
+        "total_dead_links": len(dead_links),
+        "files_with_dead_links": filtered_result.files_with_dead_links,
+        "wikilink_dead_links": dead_links_by_type.get("wikilink", 0),
+        "regular_link_dead_links": dead_links_by_type.get("regular_link", 0),
+        "link_ref_def_dead_links": dead_links_by_type.get("link_ref_def", 0),
+    })
+
+    return filtered_result
 
 
 def _output_dead_link_results(

@@ -1,0 +1,29 @@
+{
+  "detection_timestamp": "2025-10-04T10:24:46.305799",
+  "vault_path": "tests/test-data/vaults/test-myvault",
+  "summary": {
+    "total_files": 15,
+    "files_with_dead_links": 1,
+    "total_dead_links": 1,
+    "wikilink_dead_links": 1,
+    "regular_link_dead_links": 0,
+    "link_ref_def_dead_links": 0,
+    "vault_path": "tests/test-data/vaults/test-myvault"
+  },
+  "total_files_scanned": 15,
+  "files_with_dead_links": 1,
+  "total_dead_links": 1,
+  "dead_links_by_type": {
+    "wikilink": 1
+  },
+  "dead_links": [
+    {
+      "source_file": "tests/test-data/vaults/test-myvault/100_FleetingNotes/20250310103733.md",
+      "link_text": "[[MySQL]]",
+      "link_type": "wikilink",
+      "line_number": 3,
+      "target": "MySQL",
+      "suggested_fixes": []
+    }
+  ]
+}

@@ -130,7 +130,7 @@
         - Generate comprehensive dead link reports
         - _Requirements: 3.1, 3.2, 3.3_
 
-    - [ ] 6.3 Create detect-dead-links CLI command
+    - [x] 6.3 Create detect-dead-links CLI command
         - Implement CLI command with structured output
         - Add fix suggestions for common dead link patterns
         - Support filtering and sorting of results
