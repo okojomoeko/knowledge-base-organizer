@@ -178,9 +178,9 @@ class TestDeadLinkDetectionRealData:
         links_with_suggestions = [
             dl for dl in result["dead_links"] if dl["suggested_fixes"]
         ]
-        links_without_suggestions = [
-            dl for dl in result["dead_links"] if not dl["suggested_fixes"]
-        ]
+        # links_without_suggestions = [
+        #     dl for dl in result["dead_links"] if not dl["suggested_fixes"]
+        # ]
 
         # Should have some links with suggestions (similar file IDs)
         assert len(links_with_suggestions) > 0, "No suggestions generated"

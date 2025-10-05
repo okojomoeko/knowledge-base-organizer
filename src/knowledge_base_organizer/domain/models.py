@@ -232,7 +232,7 @@ class MarkdownFile(BaseModel):
 
         return True  # Unknown type, assume valid
 
-    def _get_template_exclusion_zones(self) -> list["TextRange"]:
+    def _get_template_exclusion_zones(self) -> list[Any]:
         """Get exclusion zones for template variables and template blocks."""
         from .services.link_analysis_service import TextRange
 
@@ -264,7 +264,7 @@ class MarkdownFile(BaseModel):
         return exclusion_zones
 
     def _is_in_exclusion_zone(
-        self, position: "TextPosition", exclusion_zones: list["TextRange"]
+        self, position: "TextPosition", exclusion_zones: list[Any]
     ) -> bool:
         """Check if a position falls within any exclusion zone."""
         for zone in exclusion_zones:
