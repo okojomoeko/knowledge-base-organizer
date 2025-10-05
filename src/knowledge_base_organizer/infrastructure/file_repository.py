@@ -198,6 +198,48 @@ class FileRepository:
 
         return Frontmatter(**valid_fields)
 
+    def save_file_content(
+        self, file_path: Path, content: str, *, backup: bool = True
+    ) -> None:
+        """Save content to a file with optional backup."""
+        if backup and self.config.backup_enabled:
+            self.create_backup(file_path)
+
+        file_path.write_text(content, encoding="utf-8")
+
+    def update_frontmatter(
+        self,
+        file_path: Path,
+        frontmatter_changes: dict[str, Any],
+        *,
+        backup: bool = True,
+    ) -> None:
+        """Update frontmatter fields in a file."""
+        if backup and self.config.backup_enabled:
+            self.create_backup(file_path)
+
+        # Load current file
+        current_file = self.load_file(file_path)
+
+        # Update frontmatter fields
+        frontmatter_dict = current_file.frontmatter.model_dump(exclude_unset=True)
+        frontmatter_dict.update(frontmatter_changes)
+
+        # Create new frontmatter object (validation only)
+        Frontmatter(**frontmatter_dict)
+
+        # Reconstruct content with updated frontmatter
+        if frontmatter_dict:
+            frontmatter_yaml = yaml.dump(
+                frontmatter_dict, default_flow_style=False, allow_unicode=True
+            )
+            full_content = f"---\n{frontmatter_yaml}---\n{current_file.content}"
+        else:
+            full_content = current_file.content
+
+        # Save updated content
+        file_path.write_text(full_content, encoding="utf-8")
+
     def _reconstruct_content(self, file: MarkdownFile) -> str:
         """Reconstruct full content with frontmatter."""
         frontmatter_dict = file.frontmatter.model_dump(exclude_unset=True)

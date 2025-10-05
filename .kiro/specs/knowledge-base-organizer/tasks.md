@@ -151,7 +151,7 @@
         - Create position tracking and conflict resolution
         - _Requirements: 2.1, 2.4, 2.5_
 
-    - [ ] 7.2 Implement basic auto-link generation
+    - [x] 7.2 Implement basic auto-link generation
         - Create AutoLinkGenerationUseCase for orchestrating link creation
         - Add bidirectional file updates (source + target alias updates)
         - Implement dry-run mode with preview

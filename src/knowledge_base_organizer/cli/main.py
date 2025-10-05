@@ -12,6 +12,10 @@ import typer
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
+from knowledge_base_organizer.application.auto_link_generation_use_case import (
+    AutoLinkGenerationRequest,
+    AutoLinkGenerationUseCase,
+)
 from knowledge_base_organizer.application.dead_link_detection_use_case import (
     DeadLinkDetectionRequest,
     DeadLinkDetectionUseCase,
@@ -21,6 +25,9 @@ from knowledge_base_organizer.application.frontmatter_validation_use_case import
     FrontmatterValidationUseCase,
 )
 from knowledge_base_organizer.application.vault_analyzer import VaultAnalyzer
+from knowledge_base_organizer.domain.services.content_processing_service import (
+    ContentProcessingService,
+)
 from knowledge_base_organizer.domain.services.frontmatter_validation_service import (
     FrontmatterValidationService,
 )
@@ -393,11 +400,117 @@ def detect_dead_links(
         console.print(f"[dim]Dead links found: {result.total_dead_links}[/dim]")
 
 
-# NOTE: Additional commands will be implemented in future versions
-# @app.command()
-# def auto_link(...) -> None:
-#     """Generate WikiLinks from plain text with Japanese synonym detection."""
-#     pass
+@app.command()
+def auto_link(
+    vault_path: Path = typer.Argument(..., help="Path to Obsidian vault"),
+    dry_run: bool = typer.Option(
+        True, "--dry-run/--execute", help="Preview changes without applying them"
+    ),
+    exclude_tables: bool = typer.Option(
+        False, "--exclude-tables", help="Exclude table content from link processing"
+    ),
+    max_links_per_file: int = typer.Option(
+        50, "--max-links", help="Maximum number of links to create per file"
+    ),
+    output_format: str = typer.Option(
+        OutputFormat.CONSOLE, help="Output format (json, csv, console)"
+    ),
+    include_patterns: list[str] | None = typer.Option(
+        None, "--include", help="Include file patterns"
+    ),
+    exclude_patterns: list[str] | None = typer.Option(
+        None, "--exclude", help="Exclude file patterns"
+    ),
+    target_files: list[str] | None = typer.Option(
+        None, "--target", help="Specific files to process"
+    ),
+    output_file: Path | None = typer.Option(
+        None, "--output", "-o", help="Output file for CSV/JSON results"
+    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
+) -> None:
+    """Generate WikiLinks from plain text mentions.
+
+    This command automatically detects text that matches other notes' titles or aliases
+    and converts them to WikiLinks. It excludes existing links, frontmatter, and other
+    protected areas from processing.
+
+    The command supports bidirectional updates: it adds WikiLinks to source files and
+    adds corresponding aliases to target files to maintain consistency.
+    """
+    if verbose:
+        console.print(f"[bold blue]Generating auto-links in:[/bold blue] {vault_path}")
+        console.print(f"[dim]Mode: {'dry-run' if dry_run else 'execute'}[/dim]")
+
+    # Validate vault path
+    if not vault_path.exists():
+        console.print(f"[red]✗[/red] Vault path does not exist: {vault_path}")
+        raise typer.Exit(1)
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Loading configuration...", total=None)
+
+        # Load configuration
+        config = ProcessingConfig.get_default_config()
+        if include_patterns:
+            config.include_patterns = include_patterns
+        if exclude_patterns:
+            config.exclude_patterns.extend(exclude_patterns)
+
+        # Initialize components
+        file_repository = FileRepository(config)
+        link_analysis_service = LinkAnalysisService(exclude_tables=exclude_tables)
+        content_processing_service = ContentProcessingService(
+            max_links_per_file=max_links_per_file
+        )
+
+        use_case = AutoLinkGenerationUseCase(
+            file_repository=file_repository,
+            link_analysis_service=link_analysis_service,
+            content_processing_service=content_processing_service,
+            config=config,
+        )
+
+        progress.update(task, description="Building file registry...")
+
+        # Create request
+        request = AutoLinkGenerationRequest(
+            vault_path=vault_path,
+            dry_run=dry_run,
+            exclude_tables=exclude_tables,
+            max_links_per_file=max_links_per_file,
+            include_patterns=include_patterns,
+            exclude_patterns=exclude_patterns,
+            target_files=target_files,
+        )
+
+        progress.update(task, description="Generating WikiLinks...")
+
+        try:
+            result = use_case.execute(request)
+            progress.update(task, description="Auto-link generation complete!")
+
+        except Exception as e:
+            progress.update(task, description="Auto-link generation failed!")
+            console.print(f"[red]✗[/red] Error during auto-link generation: {e}")
+            if verbose:
+                console.print(f"[dim]{traceback.format_exc()}[/dim]")
+            raise typer.Exit(1) from e
+
+    # Output results
+    _output_auto_link_results(result, output_format, output_file, console, verbose)
+
+    # Final summary
+    if verbose:
+        console.print("[green]✓[/green] Auto-link generation completed")
+        console.print(f"[dim]Files processed: {result.total_files_processed}[/dim]")
+        console.print(f"[dim]Links created: {result.total_links_created}[/dim]")
+        console.print(f"[dim]Aliases added: {result.total_aliases_added}[/dim]")
+
 
 # @app.command()
 # def aggregate(...) -> None:
@@ -502,17 +615,19 @@ def _output_validation_results(
         # Prepare CSV output
         csv_data = []
         for r in result.results:
-            csv_data.append({
-                "file_path": str(r.file_path),
-                "template_type": r.template_type or "",
-                "is_valid": r.is_valid,
-                "missing_fields": "; ".join(r.missing_fields),
-                "invalid_fields": "; ".join([
-                    f"{k}: {v}" for k, v in r.invalid_fields.items()
-                ]),
-                "warnings": "; ".join(r.warnings),
-                "suggested_fixes_count": len(r.suggested_fixes),
-            })
+            csv_data.append(
+                {
+                    "file_path": str(r.file_path),
+                    "template_type": r.template_type or "",
+                    "is_valid": r.is_valid,
+                    "missing_fields": "; ".join(r.missing_fields),
+                    "invalid_fields": "; ".join(
+                        [f"{k}: {v}" for k, v in r.invalid_fields.items()]
+                    ),
+                    "warnings": "; ".join(r.warnings),
+                    "suggested_fixes_count": len(r.suggested_fixes),
+                }
+            )
 
         if output_file:
             with output_file.open("w", newline="", encoding="utf-8") as f:
@@ -678,13 +793,15 @@ def _filter_and_sort_dead_links(
     filtered_result.files_with_dead_links = len({dl.source_file for dl in dead_links})
 
     # Update summary
-    filtered_result.summary.update({
-        "total_dead_links": len(dead_links),
-        "files_with_dead_links": filtered_result.files_with_dead_links,
-        "wikilink_dead_links": dead_links_by_type.get("wikilink", 0),
-        "regular_link_dead_links": dead_links_by_type.get("regular_link", 0),
-        "link_ref_def_dead_links": dead_links_by_type.get("link_ref_def", 0),
-    })
+    filtered_result.summary.update(
+        {
+            "total_dead_links": len(dead_links),
+            "files_with_dead_links": filtered_result.files_with_dead_links,
+            "wikilink_dead_links": dead_links_by_type.get("wikilink", 0),
+            "regular_link_dead_links": dead_links_by_type.get("regular_link", 0),
+            "link_ref_def_dead_links": dead_links_by_type.get("link_ref_def", 0),
+        }
+    )
 
     return filtered_result
 
@@ -732,14 +849,16 @@ def _output_dead_link_results(
         # Prepare CSV output
         csv_data = []
         for dl in result.dead_links:
-            csv_data.append({
-                "source_file": dl.source_file,
-                "link_text": dl.link_text,
-                "link_type": dl.link_type,
-                "line_number": dl.line_number,
-                "target": dl.target,
-                "suggested_fixes": "; ".join(dl.suggested_fixes),
-            })
+            csv_data.append(
+                {
+                    "source_file": dl.source_file,
+                    "link_text": dl.link_text,
+                    "link_type": dl.link_type,
+                    "line_number": dl.line_number,
+                    "target": dl.target,
+                    "suggested_fixes": "; ".join(dl.suggested_fixes),
+                }
+            )
 
         if output_file:
             with output_file.open("w", newline="", encoding="utf-8") as f:
@@ -774,108 +893,208 @@ def _display_dead_link_console(result, console: Console, verbose: bool) -> None:
     console.print(f"  Files with dead links: [red]{result.files_with_dead_links}[/red]")
     console.print(f"  Total dead links: [red]{result.total_dead_links}[/red]")
 
-    if result.total_dead_links == 0:
-        console.print("\n[green]✓ No dead links found! Your vault is healthy.[/green]")
-        return
-
     # Dead links by type
-    console.print("\n[bold yellow]🔍 Dead Links by Type[/bold yellow]")
-    for link_type, count in result.dead_links_by_type.items():
-        type_display = {
-            "wikilink": "WikiLinks",
-            "regular_link": "Regular Links",
-            "link_ref_def": "Link Reference Definitions",
-        }.get(link_type, link_type)
-        console.print(f"  {type_display}: [red]{count}[/red]")
+    if result.dead_links_by_type:
+        console.print("\n[bold yellow]🔗 Dead Links by Type[/bold yellow]")
+        for link_type, count in result.dead_links_by_type.items():
+            console.print(f"  {link_type}: {count}")
 
-    # Detailed results
-    if verbose or result.total_dead_links <= 20:
-        console.print("\n[bold red]❌ Dead Links Found[/bold red]")
-
-        # Group by source file for better readability
-        dead_links_by_file = {}
-        for dl in result.dead_links:
-            if dl.source_file not in dead_links_by_file:
-                dead_links_by_file[dl.source_file] = []
-            dead_links_by_file[dl.source_file].append(dl)
-
-        for source_file, dead_links in dead_links_by_file.items():
-            file_name = Path(source_file).name
+    # Show individual dead links (limited for console output)
+    if result.dead_links and (verbose or len(result.dead_links) <= 20):
+        console.print("\n[bold red]💔 Dead Links Found[/bold red]")
+        for dead_link in result.dead_links[:20]:  # Limit to first 20
             console.print(
-                f"\n  [blue]📄 {file_name}[/blue] ({len(dead_links)} dead links)"
+                f"\n  [blue]{Path(dead_link.source_file).name}[/blue]:"
+                f"{dead_link.line_number}"
+            )
+            console.print(f"    Link: {dead_link.link_text}")
+            console.print(f"    Type: {dead_link.link_type}")
+            console.print(f"    Target: {dead_link.target}")
+
+            if dead_link.suggested_fixes:
+                console.print("    Suggestions:")
+                for suggestion in dead_link.suggested_fixes:
+                    console.print(f"      • {suggestion}")
+
+        if len(result.dead_links) > 20:
+            remaining = len(result.dead_links) - 20
+            console.print(f"\n  [dim]... and {remaining} more dead links[/dim]")
+            console.print(
+                "  [dim]Use --output to save full results or --verbose for "
+                "complete list[/dim]"
             )
 
-            for dl in dead_links:
-                type_icon = {
-                    "wikilink": "🔗",
-                    "regular_link": "🌐",
-                    "link_ref_def": "📎",
-                }.get(dl.link_type, "❓")
-
-                console.print(f"    {type_icon} Line {dl.line_number}: {dl.link_text}")
-                console.print(f"      [dim]Target: {dl.target or '(empty)'}[/dim]")
-
-                if dl.suggested_fixes:
-                    console.print("      [yellow]Suggestions:[/yellow]")
-                    for fix in dl.suggested_fixes:
-                        console.print(f"        • {fix}")
-    else:
+    elif result.dead_links:
+        console.print(f"\n[yellow]Found {len(result.dead_links)} dead links[/yellow]")
         console.print(
-            f"\n[dim]Use --verbose to see detailed results for all "
-            f"{result.total_dead_links} dead links[/dim]"
+            "[dim]Use --verbose to see details or --output to save results[/dim]"
         )
 
 
-@app.command()
-def organize(
-    vault_path: Path = typer.Argument(..., help="Path to Obsidian vault"),
-    dry_run: bool = typer.Option(
-        True, "--dry-run/--execute", help="Preview changes without applying them"
-    ),
-    interactive: bool = typer.Option(
-        False, "--interactive", "-i", help="Interactive mode for reviewing improvements"
-    ),
-    output_format: str = typer.Option(
-        "console", "--format", help="Output format (console, json)"
-    ),
-    include_patterns: list[str] | None = typer.Option(
-        None, "--include", help="Include file patterns"
-    ),
-    exclude_patterns: list[str] | None = typer.Option(
-        None, "--exclude", help="Exclude file patterns"
-    ),
-    output_file: Path | None = typer.Option(
-        None, "--output", "-o", help="Output file for results"
-    ),
-    max_improvements: int = typer.Option(
-        50, "--max-improvements", help="Maximum improvements per file"
-    ),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
+def _output_auto_link_results(
+    result,
+    output_format: str,
+    output_file: Path | None,
+    console: Console,
+    verbose: bool,
 ) -> None:
-    """Automatically organize and improve knowledge base quality.
+    """Output auto-link generation results in the specified format."""
 
-    This command analyzes your vault and applies intelligent improvements including:
-    - Automatic frontmatter field completion
-    - Intelligent tag suggestions based on content
-    - Metadata extraction and population
-    - Consistency fixes and normalization
+    if output_format.lower() == OutputFormat.JSON.lower():
+        # Prepare JSON output
+        json_data = {
+            "generation_timestamp": datetime.now().isoformat(),
+            "vault_path": result.vault_path,
+            "summary": result.summary,
+            "total_files_processed": result.total_files_processed,
+            "total_links_created": result.total_links_created,
+            "total_aliases_added": result.total_aliases_added,
+            "file_updates": [
+                {
+                    "file_path": str(update.file_path),
+                    "update_type": update.update_type,
+                    "applied_replacements": len(update.applied_replacements)
+                    if update.applied_replacements
+                    else 0,
+                    "frontmatter_changes": update.frontmatter_changes,
+                }
+                for update in result.file_updates
+            ],
+            "skipped_files": result.skipped_files,
+            "errors": result.errors,
+        }
 
-    Use --dry-run to preview changes before applying them.
-    Use --interactive to review each improvement before applying.
-    """
-    from .organize_command import organize_command
+        if output_file:
+            with output_file.open("w", encoding="utf-8") as f:
+                json.dump(json_data, f, indent=2, ensure_ascii=False)
+            console.print(f"[green]✓[/green] JSON results saved to: {output_file}")
+        else:
+            console.print(json.dumps(json_data, indent=2, ensure_ascii=False))
 
-    organize_command(
-        vault_path=vault_path,
-        dry_run=dry_run,
-        interactive=interactive,
-        output_format=output_format,
-        include_patterns=include_patterns,
-        exclude_patterns=exclude_patterns,
-        output_file=output_file,
-        max_improvements=max_improvements,
-        verbose=verbose,
-    )
+    elif output_format.lower() == OutputFormat.CSV.lower():
+        # Prepare CSV output
+        csv_data = []
+        for update in result.file_updates:
+            csv_data.append(
+                {
+                    "file_path": str(update.file_path),
+                    "update_type": update.update_type,
+                    "links_added": len(update.applied_replacements)
+                    if update.applied_replacements
+                    else 0,
+                    "aliases_added": len(update.frontmatter_changes.get("aliases", []))
+                    if update.frontmatter_changes
+                    else 0,
+                }
+            )
+
+        if output_file:
+            with output_file.open("w", newline="", encoding="utf-8") as f:
+                if csv_data:
+                    writer = csv.DictWriter(f, fieldnames=csv_data[0].keys())
+                    writer.writeheader()
+                    writer.writerows(csv_data)
+            console.print(f"[green]✓[/green] CSV results saved to: {output_file}")
+        # Output CSV to console
+        elif csv_data:
+            output = io.StringIO()
+            writer = csv.DictWriter(output, fieldnames=csv_data[0].keys())
+            writer.writeheader()
+            writer.writerows(csv_data)
+            console.print(output.getvalue())
+
+    else:
+        # Console format (default)
+        _display_auto_link_console(result, console, verbose)
+
+
+def _display_auto_link_console(result, console: Console, verbose: bool) -> None:  # noqa: PLR0912
+    """Display auto-link generation results in console format."""
+    console.print("\n[bold blue]🔗 Auto-Link Generation Results[/bold blue]")
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    console.print(f"[dim]Generation completed at: {timestamp}[/dim]")
+    console.print(f"[dim]Vault: {result.vault_path}[/dim]\n")
+
+    # Summary statistics
+    console.print("[bold green]📊 Summary[/bold green]")
+    console.print(f"  Files processed: {result.total_files_processed}")
+    console.print(f"  Links created: [green]{result.total_links_created}[/green]")
+    console.print(f"  Aliases added: [cyan]{result.total_aliases_added}[/cyan]")
+    console.print(f"  Success rate: {result.summary.get('success_rate', 'N/A')}")
+
+    # Update statistics
+    if result.summary:
+        console.print("\n[bold yellow]📝 Update Statistics[/bold yellow]")
+        console.print(
+            f"  Files with links added: "
+            f"{result.summary.get('files_with_links_added', 0)}"
+        )
+        console.print(
+            f"  Files with aliases added: "
+            f"{result.summary.get('files_with_aliases_added', 0)}"
+        )
+        console.print(
+            f"  Conflicts resolved: {result.summary.get('conflicts_resolved', 0)}"
+        )
+        console.print(
+            f"  Candidates skipped: {result.summary.get('candidates_skipped', 0)}"
+        )
+
+    # Show errors if any
+    if result.errors:
+        console.print(f"\n[bold red]❌ Errors ({len(result.errors)})[/bold red]")
+        for error in result.errors[:5]:  # Show first 5 errors
+            console.print(f"  • {error}")
+        if len(result.errors) > 5:
+            console.print(f"  [dim]... and {len(result.errors) - 5} more errors[/dim]")
+
+    # Show skipped files if any
+    if result.skipped_files:
+        console.print(
+            f"\n[bold orange3]⚠️  Skipped Files "
+            f"({len(result.skipped_files)})[/bold orange3]"
+        )
+        if verbose:
+            for skipped in result.skipped_files:
+                console.print(f"  • {skipped}")
+        else:
+            console.print(
+                f"  {len(result.skipped_files)} files skipped "
+                f"(use --verbose for details)"
+            )
+
+    # Show detailed file updates
+    if verbose and result.file_updates:
+        console.print("\n[bold cyan]📄 File Updates[/bold cyan]")
+        wikilink_updates = [
+            u for u in result.file_updates if u.update_type == "add_wikilink"
+        ]
+        alias_updates = [u for u in result.file_updates if u.update_type == "add_alias"]
+
+        if wikilink_updates:
+            console.print("\n  [green]WikiLink Updates:[/green]")
+            for update in wikilink_updates[:10]:  # Show first 10
+                links_count = (
+                    len(update.applied_replacements)
+                    if update.applied_replacements
+                    else 0
+                )
+                console.print(
+                    f"    {Path(update.file_path).name}: {links_count} links added"
+                )
+
+        if alias_updates:
+            console.print("\n  [cyan]Alias Updates:[/cyan]")
+            for update in alias_updates[:10]:  # Show first 10
+                if (
+                    update.frontmatter_changes
+                    and "aliases" in update.frontmatter_changes
+                ):
+                    aliases = update.frontmatter_changes["aliases"]
+                    console.print(
+                        f"    {Path(update.file_path).name}: "
+                        f"{len(aliases)} total aliases"
+                    )
 
 
 def main() -> None:
