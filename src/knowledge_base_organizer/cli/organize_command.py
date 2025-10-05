@@ -1,6 +1,7 @@
 """CLI command for automatic vault organization."""
 
 import json
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,7 @@ def organize_command(
     output_file: Path | None = None,
     max_improvements: int = 50,
     verbose: bool = False,
+    create_backup: bool = True,
 ) -> None:
     """Automatically organize and improve knowledge base quality."""
     try:
@@ -71,10 +73,31 @@ def organize_command(
 
         # Apply changes if not dry-run
         if not dry_run:
-            if interactive:
-                _apply_interactive_changes(results, vault_path, config)
-            else:
-                _apply_all_changes(results, vault_path, config)
+            # Create backup before applying changes
+            backup_path = None
+            if create_backup:
+                backup_path = _create_vault_backup(vault_path)
+                console.print(f"📦 Backup created at: {backup_path}")
+
+            try:
+                if interactive:
+                    applied_count = _apply_interactive_changes(
+                        results, vault_path, config
+                    )
+                else:
+                    applied_count = _apply_all_changes(results, vault_path, config)
+
+                # Generate comprehensive improvement report
+                _generate_improvement_report(
+                    results, applied_count, vault_path, output_file
+                )
+
+            except Exception as e:
+                if backup_path:
+                    console.print(f"❌ Error occurred: {e}")
+                    console.print(f"💾 Backup available at: {backup_path}")
+                    console.print("Use the backup to restore your vault if needed.")
+                raise
 
     except Exception as e:
         console.print(f"❌ Error during organization: {e}")
@@ -255,3 +278,122 @@ def _apply_interactive_changes(
         console.print()  # Empty line for readability
 
     console.print(f"✅ Applied improvements to {applied_count} files")
+    return applied_count
+
+
+def _create_vault_backup(vault_path: Path) -> Path:
+    """Create a backup of the vault before applying changes."""
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_name = f"{vault_path.name}_backup_{timestamp}"
+    backup_path = vault_path.parent / backup_name
+
+    console.print(f"📦 Creating backup: {backup_path}")
+    shutil.copytree(
+        vault_path, backup_path, ignore=shutil.ignore_patterns("*.tmp", ".obsidian")
+    )
+
+    return backup_path
+
+
+def _generate_improvement_report(
+    results: list[Any], applied_count: int, vault_path: Path, output_file: Path | None
+) -> None:
+    """Generate a comprehensive improvement report."""
+    report_data = {
+        "vault_path": str(vault_path),
+        "timestamp": datetime.now().isoformat(),
+        "summary": {
+            "total_files_analyzed": len(results),
+            "files_improved": applied_count,
+            "total_improvements": sum(r.improvements_made for r in results),
+            "improvement_categories": _categorize_improvements(results),
+        },
+        "detailed_improvements": [
+            {
+                "file_path": str(result.file_path),
+                "improvements_made": result.improvements_made,
+                "changes_applied": result.changes_applied,
+                "success": result.success,
+            }
+            for result in results
+        ],
+        "metrics": {
+            "files_with_frontmatter_improvements": sum(
+                1
+                for r in results
+                if any(
+                    "frontmatter" in str(change).lower() for change in r.changes_applied
+                )
+            ),
+            "files_with_metadata_additions": sum(
+                1
+                for r in results
+                if any(
+                    "metadata" in str(change).lower() for change in r.changes_applied
+                )
+            ),
+            "files_with_tag_improvements": sum(
+                1
+                for r in results
+                if any("tag" in str(change).lower() for change in r.changes_applied)
+            ),
+        },
+    }
+
+    # Save report
+    report_filename = (
+        f"organization_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    )
+    report_path = output_file or (vault_path / report_filename)
+
+    with report_path.open("w", encoding="utf-8") as f:
+        json.dump(report_data, f, indent=2, ensure_ascii=False)
+
+    console.print(f"📊 Comprehensive improvement report saved to: {report_path}")
+
+    # Display summary
+    console.print("\n📈 Organization Summary:")
+    console.print(f"  Files analyzed: {report_data['summary']['total_files_analyzed']}")
+    console.print(f"  Files improved: {report_data['summary']['files_improved']}")
+    console.print(
+        f"  Total improvements: {report_data['summary']['total_improvements']}"
+    )
+    console.print(
+        f"  Frontmatter improvements: "
+        f"{report_data['metrics']['files_with_frontmatter_improvements']}"
+    )
+    console.print(
+        f"  Metadata additions: "
+        f"{report_data['metrics']['files_with_metadata_additions']}"
+    )
+    console.print(
+        f"  Tag improvements: {report_data['metrics']['files_with_tag_improvements']}"
+    )
+
+
+def _categorize_improvements(results: list[Any]) -> dict[str, int]:
+    """Categorize improvements by type."""
+    categories = {
+        "frontmatter_fixes": 0,
+        "metadata_additions": 0,
+        "tag_improvements": 0,
+        "content_enhancements": 0,
+        "consistency_fixes": 0,
+    }
+
+    for result in results:
+        for change in result.changes_applied:
+            change_str = str(change).lower()
+            if "frontmatter" in change_str:
+                categories["frontmatter_fixes"] += 1
+            elif "metadata" in change_str:
+                categories["metadata_additions"] += 1
+            elif "tag" in change_str:
+                categories["tag_improvements"] += 1
+            elif "content" in change_str:
+                categories["content_enhancements"] += 1
+            else:
+                categories["consistency_fixes"] += 1
+
+    return categories

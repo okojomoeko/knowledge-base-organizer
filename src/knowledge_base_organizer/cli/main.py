@@ -43,6 +43,8 @@ from knowledge_base_organizer.infrastructure.template_schema_repository import (
     TemplateSchemaRepository,
 )
 
+from .organize_command import organize_command
+
 app = typer.Typer(
     name="knowledge-base-organizer",
     help="Obsidian vault organizer with advanced Japanese WikiLink detection",
@@ -556,6 +558,58 @@ def auto_link(
 
     # Enhanced final summary with performance metrics for large vaults
     _display_auto_link_summary(result, file_count, is_large_vault, verbose, console)
+
+
+@app.command()
+def organize(
+    vault_path: Path = typer.Argument(..., help="Path to Obsidian vault"),
+    dry_run: bool = typer.Option(
+        True, "--dry-run/--execute", help="Preview changes without applying them"
+    ),
+    interactive: bool = typer.Option(
+        False, "--interactive", "-i", help="Interactive mode for reviewing improvements"
+    ),
+    output_format: str = typer.Option(
+        OutputFormat.CONSOLE, help="Output format (json, console)"
+    ),
+    include_patterns: list[str] | None = typer.Option(
+        None, "--include", help="Include file patterns"
+    ),
+    exclude_patterns: list[str] | None = typer.Option(
+        None, "--exclude", help="Exclude file patterns"
+    ),
+    output_file: Path | None = typer.Option(
+        None, "--output", "-o", help="Output file for JSON results"
+    ),
+    max_improvements: int = typer.Option(
+        50, "--max-improvements", help="Maximum improvements per file"
+    ),
+    create_backup: bool = typer.Option(
+        True, "--backup/--no-backup", help="Create backup before applying changes"
+    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
+) -> None:
+    """Automatically organize and improve knowledge base quality.
+
+    This command analyzes your vault and automatically improves frontmatter,
+    fixes inconsistencies, and enhances content organization. It can run in
+    dry-run mode to preview changes or execute mode to apply improvements.
+
+    Interactive mode allows reviewing each improvement before applying it.
+    """
+
+    organize_command(
+        vault_path=vault_path,
+        dry_run=dry_run,
+        interactive=interactive,
+        output_format=output_format,
+        include_patterns=include_patterns,
+        exclude_patterns=exclude_patterns,
+        output_file=output_file,
+        max_improvements=max_improvements,
+        verbose=verbose,
+        create_backup=create_backup,
+    )
 
 
 # @app.command()
