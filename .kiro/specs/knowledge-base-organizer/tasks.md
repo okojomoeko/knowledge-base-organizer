@@ -157,7 +157,7 @@
         - Implement dry-run mode with preview
         - _Requirements: 2.8, 2.9_
 
-    - [ ] 7.3 Create auto-link CLI command
+    - [x] 7.3 Create auto-link CLI command
         - Implement CLI command with safety controls (max links per file)
         - Add progress reporting for large vaults
         - Support configurable exclusion patterns

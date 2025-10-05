@@ -1,5 +1,6 @@
 """Use case for automatic WikiLink generation from plain text mentions."""
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -11,7 +12,7 @@ from ..domain.services.content_processing_service import (
     ContentProcessingService,
     LinkReplacement,
 )
-from ..domain.services.link_analysis_service import LinkAnalysisService
+from ..domain.services.link_analysis_service import LinkAnalysisService, TextRange
 from ..infrastructure.config import ProcessingConfig
 from ..infrastructure.file_repository import FileRepository
 
@@ -31,6 +32,10 @@ class AutoLinkGenerationRequest(BaseModel):
     include_patterns: list[str] | None = None
     exclude_patterns: list[str] | None = None
     target_files: list[str] | None = None  # Specific files to process
+    max_files_to_process: int | None = None  # Maximum number of files to process
+    exclude_content_patterns: list[str] | None = (
+        None  # Content patterns to exclude from linking
+    )
 
 
 class FileUpdate(BaseModel):
@@ -111,7 +116,14 @@ class AutoLinkGenerationUseCase:
         else:
             files_to_process = files
 
-        # 4. Process each file for link generation
+        # 4. Limit number of files to process if specified (useful for large vaults)
+        if (
+            request.max_files_to_process
+            and len(files_to_process) > request.max_files_to_process
+        ):
+            files_to_process = files_to_process[: request.max_files_to_process]
+
+        # 5. Process each file for link generation
         file_updates = []
         processing_results = []
         skipped_files = []
@@ -128,6 +140,13 @@ class AutoLinkGenerationUseCase:
                 exclusion_zones = self.link_analysis_service.extract_exclusion_zones(
                     file.content
                 )
+
+                # Add custom content pattern exclusions if specified
+                if request.exclude_content_patterns:
+                    custom_exclusions = self._extract_custom_exclusion_zones(
+                        file.content, request.exclude_content_patterns
+                    )
+                    exclusion_zones.extend(custom_exclusions)
 
                 # Configure table exclusion
                 if request.exclude_tables:
@@ -175,11 +194,11 @@ class AutoLinkGenerationUseCase:
                 errors.append(error_msg)
                 continue
 
-        # 5. Apply updates if not dry-run
+        # 6. Apply updates if not dry-run
         if not request.dry_run:
             self._apply_file_updates(file_updates)
 
-        # 6. Generate summary
+        # 7. Generate summary
         summary = self._generate_summary(
             files_to_process, file_updates, processing_results, errors
         )
@@ -345,18 +364,22 @@ class AutoLinkGenerationUseCase:
         )
 
         # Files with links added
-        files_with_links = len({
-            update.file_path
-            for update in file_updates
-            if update.update_type == "add_wikilink"
-        })
+        files_with_links = len(
+            {
+                update.file_path
+                for update in file_updates
+                if update.update_type == "add_wikilink"
+            }
+        )
 
         # Files with aliases added
-        files_with_aliases = len({
-            update.file_path
-            for update in file_updates
-            if update.update_type == "add_alias"
-        })
+        files_with_aliases = len(
+            {
+                update.file_path
+                for update in file_updates
+                if update.update_type == "add_alias"
+            }
+        )
 
         return {
             "files_processed": len(files_processed),
@@ -373,3 +396,38 @@ class AutoLinkGenerationUseCase:
                 else "0%"
             ),
         }
+
+    def _extract_custom_exclusion_zones(
+        self, content: str, patterns: list[str]
+    ) -> list:
+        """Extract custom exclusion zones based on regex patterns.
+
+        Args:
+            content: The markdown content to analyze
+            patterns: List of regex patterns to exclude from auto-linking
+
+        Returns:
+            List of TextRange objects representing exclusion zones
+        """
+
+        exclusion_zones = []
+        lines = content.split("\n")
+
+        for pattern in patterns:
+            try:
+                regex = re.compile(pattern, re.IGNORECASE | re.MULTILINE)
+                for line_num, line in enumerate(lines, 1):
+                    for match in regex.finditer(line):
+                        exclusion_zones.append(
+                            TextRange(
+                                start_line=line_num,
+                                end_line=line_num,
+                                start_column=match.start(),
+                                end_column=match.end(),
+                            )
+                        )
+            except re.error:
+                # Skip invalid regex patterns
+                continue
+
+        return exclusion_zones

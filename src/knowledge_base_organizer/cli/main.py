@@ -412,6 +412,11 @@ def auto_link(
     max_links_per_file: int = typer.Option(
         50, "--max-links", help="Maximum number of links to create per file"
     ),
+    max_files_to_process: int | None = typer.Option(
+        None,
+        "--max-files",
+        help="Maximum number of files to process (useful for testing large vaults)",
+    ),
     output_format: str = typer.Option(
         OutputFormat.CONSOLE, help="Output format (json, csv, console)"
     ),
@@ -420,6 +425,11 @@ def auto_link(
     ),
     exclude_patterns: list[str] | None = typer.Option(
         None, "--exclude", help="Exclude file patterns"
+    ),
+    exclude_content_patterns: list[str] | None = typer.Option(
+        None,
+        "--exclude-content",
+        help="Exclude content patterns from auto-linking (regex patterns)",
     ),
     target_files: list[str] | None = typer.Option(
         None, "--target", help="Specific files to process"
@@ -447,22 +457,40 @@ def auto_link(
         console.print(f"[red]✗[/red] Vault path does not exist: {vault_path}")
         raise typer.Exit(1)
 
+    # Load configuration first to get file count for progress reporting
+    config = _setup_auto_link_config(include_patterns, exclude_patterns)
+
+    # Initialize file repository to get file count
+    file_repository = FileRepository(config)
+
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         console=console,
     ) as progress:
-        task = progress.add_task("Loading configuration...", total=None)
+        task = progress.add_task("Loading vault files...", total=None)
 
-        # Load configuration
-        config = ProcessingConfig.get_default_config()
-        if include_patterns:
-            config.include_patterns = include_patterns
-        if exclude_patterns:
-            config.exclude_patterns.extend(exclude_patterns)
+        # Load files to determine vault size for progress reporting
+        try:
+            files = file_repository.load_vault(vault_path)
+            file_count = len(files)
+
+            # Determine if this is a large vault (>100 files)
+            is_large_vault = file_count > 100
+
+            if verbose or is_large_vault:
+                console.print(f"[dim]Found {file_count} markdown files in vault[/dim]")
+
+        except Exception as e:
+            progress.update(task, description="Failed to load vault!")
+            console.print(f"[red]✗[/red] Error loading vault: {e}")
+            if verbose:
+                console.print(f"[dim]{traceback.format_exc()}[/dim]")
+            raise typer.Exit(1) from e
+
+        progress.update(task, description="Initializing components...")
 
         # Initialize components
-        file_repository = FileRepository(config)
         link_analysis_service = LinkAnalysisService(exclude_tables=exclude_tables)
         content_processing_service = ContentProcessingService(
             max_links_per_file=max_links_per_file
@@ -478,21 +506,43 @@ def auto_link(
         progress.update(task, description="Building file registry...")
 
         # Create request
-        request = AutoLinkGenerationRequest(
-            vault_path=vault_path,
-            dry_run=dry_run,
-            exclude_tables=exclude_tables,
-            max_links_per_file=max_links_per_file,
-            include_patterns=include_patterns,
-            exclude_patterns=exclude_patterns,
-            target_files=target_files,
+        request = _create_auto_link_request(
+            vault_path,
+            dry_run,
+            exclude_tables,
+            max_links_per_file,
+            max_files_to_process,
+            include_patterns,
+            exclude_patterns,
+            exclude_content_patterns,
+            target_files,
         )
 
-        progress.update(task, description="Generating WikiLinks...")
+        # Enhanced progress reporting for large vaults
+        if is_large_vault:
+            progress.update(
+                task, description=f"Processing {file_count} files for auto-linking..."
+            )
+            if verbose:
+                console.print(
+                    "[dim]Large vault detected - processing may take several "
+                    "minutes[/dim]"
+                )
+        else:
+            progress.update(task, description="Generating WikiLinks...")
 
         try:
             result = use_case.execute(request)
-            progress.update(task, description="Auto-link generation complete!")
+
+            # Enhanced completion message for large vaults
+            if is_large_vault:
+                progress.update(
+                    task,
+                    description=f"Auto-link generation complete! "
+                    f"Processed {result.total_files_processed} files",
+                )
+            else:
+                progress.update(task, description="Auto-link generation complete!")
 
         except Exception as e:
             progress.update(task, description="Auto-link generation failed!")
@@ -504,12 +554,8 @@ def auto_link(
     # Output results
     _output_auto_link_results(result, output_format, output_file, console, verbose)
 
-    # Final summary
-    if verbose:
-        console.print("[green]✓[/green] Auto-link generation completed")
-        console.print(f"[dim]Files processed: {result.total_files_processed}[/dim]")
-        console.print(f"[dim]Links created: {result.total_links_created}[/dim]")
-        console.print(f"[dim]Aliases added: {result.total_aliases_added}[/dim]")
+    # Enhanced final summary with performance metrics for large vaults
+    _display_auto_link_summary(result, file_count, is_large_vault, verbose, console)
 
 
 # @app.command()
@@ -615,17 +661,19 @@ def _output_validation_results(
         # Prepare CSV output
         csv_data = []
         for r in result.results:
-            csv_data.append({
-                "file_path": str(r.file_path),
-                "template_type": r.template_type or "",
-                "is_valid": r.is_valid,
-                "missing_fields": "; ".join(r.missing_fields),
-                "invalid_fields": "; ".join([
-                    f"{k}: {v}" for k, v in r.invalid_fields.items()
-                ]),
-                "warnings": "; ".join(r.warnings),
-                "suggested_fixes_count": len(r.suggested_fixes),
-            })
+            csv_data.append(
+                {
+                    "file_path": str(r.file_path),
+                    "template_type": r.template_type or "",
+                    "is_valid": r.is_valid,
+                    "missing_fields": "; ".join(r.missing_fields),
+                    "invalid_fields": "; ".join(
+                        [f"{k}: {v}" for k, v in r.invalid_fields.items()]
+                    ),
+                    "warnings": "; ".join(r.warnings),
+                    "suggested_fixes_count": len(r.suggested_fixes),
+                }
+            )
 
         if output_file:
             with output_file.open("w", newline="", encoding="utf-8") as f:
@@ -712,6 +760,83 @@ def _display_detailed_results(result, console: Console, verbose: bool) -> None:
                 _display_single_file_result(validation_result, console)
 
 
+def _setup_auto_link_config(
+    include_patterns: list[str] | None,
+    exclude_patterns: list[str] | None,
+) -> ProcessingConfig:
+    """Set up configuration for auto-link generation."""
+    config = ProcessingConfig.get_default_config()
+    if include_patterns:
+        config.include_patterns = include_patterns
+    if exclude_patterns:
+        config.exclude_patterns.extend(exclude_patterns)
+    return config
+
+
+def _create_auto_link_request(
+    vault_path: Path,
+    dry_run: bool,
+    exclude_tables: bool,
+    max_links_per_file: int,
+    max_files_to_process: int | None,
+    include_patterns: list[str] | None,
+    exclude_patterns: list[str] | None,
+    exclude_content_patterns: list[str] | None,
+    target_files: list[str] | None,
+) -> AutoLinkGenerationRequest:
+    """Create auto-link generation request."""
+    return AutoLinkGenerationRequest(
+        vault_path=vault_path,
+        dry_run=dry_run,
+        exclude_tables=exclude_tables,
+        max_links_per_file=max_links_per_file,
+        include_patterns=include_patterns,
+        exclude_patterns=exclude_patterns,
+        target_files=target_files,
+        max_files_to_process=max_files_to_process,
+        exclude_content_patterns=exclude_content_patterns,
+    )
+
+
+def _display_auto_link_summary(
+    result, file_count: int, is_large_vault: bool, verbose: bool, console: Console
+) -> None:
+    """Display final summary for auto-link generation."""
+    if verbose or is_large_vault:
+        console.print("[green]✓[/green] Auto-link generation completed")
+        console.print(f"[dim]Files processed: {result.total_files_processed}[/dim]")
+        console.print(f"[dim]Links created: {result.total_links_created}[/dim]")
+        console.print(f"[dim]Aliases added: {result.total_aliases_added}[/dim]")
+
+        # Additional metrics for large vaults
+        if is_large_vault:
+            success_rate = (
+                (result.total_files_processed / file_count) * 100
+                if file_count > 0
+                else 0
+            )
+            console.print(f"[dim]Success rate: {success_rate:.1f}%[/dim]")
+
+            if result.errors:
+                console.print(f"[dim]Errors encountered: {len(result.errors)}[/dim]")
+            if result.skipped_files:
+                console.print(f"[dim]Files skipped: {len(result.skipped_files)}[/dim]")
+
+            # Performance tip for large vaults
+            if result.total_links_created > 0:
+                avg_links_per_file = (
+                    result.total_links_created / result.total_files_processed
+                )
+                console.print(
+                    f"[dim]Average links per file: {avg_links_per_file:.1f}[/dim]"
+                )
+    elif verbose:
+        console.print("[green]✓[/green] Auto-link generation completed")
+        console.print(f"[dim]Files processed: {result.total_files_processed}[/dim]")
+        console.print(f"[dim]Links created: {result.total_links_created}[/dim]")
+        console.print(f"[dim]Aliases added: {result.total_aliases_added}[/dim]")
+
+
 def _display_single_file_result(validation_result, console: Console) -> None:
     """Display result for a single file."""
     console.print(f"\n  [blue]{validation_result.file_path.name}[/blue]")
@@ -791,13 +916,15 @@ def _filter_and_sort_dead_links(
     filtered_result.files_with_dead_links = len({dl.source_file for dl in dead_links})
 
     # Update summary
-    filtered_result.summary.update({
-        "total_dead_links": len(dead_links),
-        "files_with_dead_links": filtered_result.files_with_dead_links,
-        "wikilink_dead_links": dead_links_by_type.get("wikilink", 0),
-        "regular_link_dead_links": dead_links_by_type.get("regular_link", 0),
-        "link_ref_def_dead_links": dead_links_by_type.get("link_ref_def", 0),
-    })
+    filtered_result.summary.update(
+        {
+            "total_dead_links": len(dead_links),
+            "files_with_dead_links": filtered_result.files_with_dead_links,
+            "wikilink_dead_links": dead_links_by_type.get("wikilink", 0),
+            "regular_link_dead_links": dead_links_by_type.get("regular_link", 0),
+            "link_ref_def_dead_links": dead_links_by_type.get("link_ref_def", 0),
+        }
+    )
 
     return filtered_result
 
@@ -845,14 +972,16 @@ def _output_dead_link_results(
         # Prepare CSV output
         csv_data = []
         for dl in result.dead_links:
-            csv_data.append({
-                "source_file": dl.source_file,
-                "link_text": dl.link_text,
-                "link_type": dl.link_type,
-                "line_number": dl.line_number,
-                "target": dl.target,
-                "suggested_fixes": "; ".join(dl.suggested_fixes),
-            })
+            csv_data.append(
+                {
+                    "source_file": dl.source_file,
+                    "link_text": dl.link_text,
+                    "link_type": dl.link_type,
+                    "line_number": dl.line_number,
+                    "target": dl.target,
+                    "suggested_fixes": "; ".join(dl.suggested_fixes),
+                }
+            )
 
         if output_file:
             with output_file.open("w", newline="", encoding="utf-8") as f:
@@ -969,16 +1098,18 @@ def _output_auto_link_results(
         # Prepare CSV output
         csv_data = []
         for update in result.file_updates:
-            csv_data.append({
-                "file_path": str(update.file_path),
-                "update_type": update.update_type,
-                "links_added": len(update.applied_replacements)
-                if update.applied_replacements
-                else 0,
-                "aliases_added": len(update.frontmatter_changes.get("aliases", []))
-                if update.frontmatter_changes
-                else 0,
-            })
+            csv_data.append(
+                {
+                    "file_path": str(update.file_path),
+                    "update_type": update.update_type,
+                    "links_added": len(update.applied_replacements)
+                    if update.applied_replacements
+                    else 0,
+                    "aliases_added": len(update.frontmatter_changes.get("aliases", []))
+                    if update.frontmatter_changes
+                    else 0,
+                }
+            )
 
         if output_file:
             with output_file.open("w", newline="", encoding="utf-8") as f:
