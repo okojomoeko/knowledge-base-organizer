@@ -96,6 +96,14 @@ class FileRepository:
 
     def _should_include_file(self, file_path: Path, vault_path: Path) -> bool:
         """Check if file should be included based on exclude patterns."""
+        # Skip directories - only process files
+        if not file_path.is_file():
+            return False
+
+        # Only process markdown files
+        if file_path.suffix.lower() != ".md":
+            return False
+
         relative_path = file_path.relative_to(vault_path)
         relative_str = str(relative_path)
         path_parts = relative_path.parts
