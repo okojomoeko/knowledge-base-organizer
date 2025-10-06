@@ -114,11 +114,25 @@ uv run python -m knowledge_base_organizer organize /path/to/vault --execute --ba
 # 特定のディレクトリのみ処理
 uv run python -m knowledge_base_organizer analyze /path/to/vault --include "101_PermanentNotes/**"
 
+# 複数のディレクトリを対象にする（--includeを複数回指定）
+uv run python -m knowledge_base_organizer analyze /path/to/vault \
+  --include "101_PermanentNotes/**" \
+  --include "100_FleetingNotes/**"
+
 # 特定のファイルを除外
 uv run python -m knowledge_base_organizer validate-frontmatter /path/to/vault --exclude "900_Templates/**"
 
-# 複数パターンを指定
-uv run python -m knowledge_base_organizer auto-link /path/to/vault --include "*.md" --exclude "draft_*"
+# 複数の除外パターンを指定（--excludeを複数回指定）
+uv run python -m knowledge_base_organizer auto-link /path/to/vault \
+  --exclude "900_Templates/**" \
+  --exclude "Archive/**" \
+  --exclude "draft_*"
+
+# includeとexcludeを組み合わせ
+uv run python -m knowledge_base_organizer organize /path/to/vault \
+  --include "101_PermanentNotes/**" \
+  --include "100_FleetingNotes/**" \
+  --exclude "*.draft.md"
 ```
 
 ## ⚙️ よく使うオプション
@@ -139,8 +153,8 @@ uv run python -m knowledge_base_organizer auto-link /path/to/vault --include "*.
 
 ### フィルタリングオプション
 
-- `--include PATTERN`: 処理対象ファイルパターン
-- `--exclude PATTERN`: 除外ファイルパターン
+- `--include PATTERN`: 処理対象ファイルパターン（複数回指定可能）
+- `--exclude PATTERN`: 除外ファイルパターン（複数回指定可能）
 - `--template NAME`: 特定のテンプレートのみ処理
 
 ## 🔧 高度な使い方
@@ -193,8 +207,12 @@ uv run python -m knowledge_base_organizer auto-link /path/to/vault --execute --m
 # 特定のディレクトリのみ処理
 uv run python -m knowledge_base_organizer organize /path/to/vault --include "101_PermanentNotes/**"
 
-# 除外パターンを活用
-uv run python -m knowledge_base_organizer auto-link /path/to/vault --exclude "900_Templates/**" --exclude "Archive/**"
+# 複数のディレクトリを対象にしつつ、不要なディレクトリを除外
+uv run python -m knowledge_base_organizer auto-link /path/to/vault \
+  --include "101_PermanentNotes/**" \
+  --include "100_FleetingNotes/**" \
+  --exclude "900_Templates/**" \
+  --exclude "Archive/**"
 ```
 
 ## 🆘 トラブルシューティング
@@ -220,6 +238,22 @@ uv run python -m knowledge_base_organizer auto-link /path/to/vault --dry-run --m
 ```bash
 # ファイル数を制限
 uv run python -m knowledge_base_organizer organize /path/to/vault --max-files 50
+```
+
+**Q: 複数のディレクトリを対象にしたい**
+
+```bash
+# --includeオプションを複数回指定
+uv run python -m knowledge_base_organizer analyze /path/to/vault \
+  --include "100_FleetingNotes/**" \
+  --include "101_PermanentNotes/**" \
+  --include "102_Literature/**"
+
+# または、複数の除外パターンを指定
+uv run python -m knowledge_base_organizer auto-link /path/to/vault \
+  --exclude "900_Templates/**" \
+  --exclude "Archive/**" \
+  --exclude "Draft/**"
 ```
 
 ## 🔗 関連リンク
@@ -306,6 +340,21 @@ uv run python -m knowledge_base_organizer auto-link /path/to/diary-vault --execu
 
 # プロジェクトノート用（包括的整理）
 uv run python -m knowledge_base_organizer organize /path/to/project-vault --execute --interactive --backup
+
+# メインコンテンツのみ処理（テンプレートやアーカイブを除外）
+uv run python -m knowledge_base_organizer auto-link /path/to/vault \
+  --include "100_FleetingNotes/**" \
+  --include "101_PermanentNotes/**" \
+  --include "102_Literature/**" \
+  --exclude "900_Templates/**" \
+  --exclude "Archive/**" \
+  --exclude "*.draft.md"
+
+# 特定のプロジェクトフォルダのみ整理
+uv run python -m knowledge_base_organizer organize /path/to/vault \
+  --include "Projects/ProjectA/**" \
+  --include "Projects/ProjectB/**" \
+  --execute --backup
 ```
 
 ### 出力結果の活用
