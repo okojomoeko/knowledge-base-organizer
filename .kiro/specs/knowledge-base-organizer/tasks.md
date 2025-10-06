@@ -163,7 +163,7 @@
         - Support configurable exclusion patterns
         - _Requirements: 5.1, 5.2, 5.3_
 
-    - [ ] 7.4 Test basic auto-linking
+    - [x] 7.4 Test basic auto-linking
         - Test with test-myvault data to create actual links
         - Verify no existing content is corrupted
         - Test rollback functionality
