@@ -34,6 +34,9 @@ from knowledge_base_organizer.domain.services.frontmatter_validation_service imp
 from knowledge_base_organizer.domain.services.link_analysis_service import (
     LinkAnalysisService,
 )
+from knowledge_base_organizer.domain.services.yaml_type_converter import (
+    YAMLTypeConverter,
+)
 from knowledge_base_organizer.infrastructure.config import (
     OutputFormat,
     ProcessingConfig,
@@ -205,17 +208,21 @@ def validate_frontmatter(
 
     This command validates frontmatter in markdown files against template schemas.
     When --template is specified, uses that template file's frontmatter as the schema.
-    When --template is not specified, uses automatic template detection from template directories.
+    When --template is not specified, uses automatic template detection from
+    template directories.
 
-    The command can run in dry-run mode to preview changes, or in execute mode to apply fixes automatically.
-    Interactive mode allows reviewing each fix before applying it.
+    The command can run in dry-run mode to preview changes, or in execute mode to
+    apply fixes automatically. Interactive mode allows reviewing each fix before
+    applying it.
 
     Examples:
         # Validate using specific template
-        validate-frontmatter /path/to/vault --template ~/vault/900_TemplaterNotes/new-fleeing-note.md
+        validate-frontmatter /path/to/vault \\
+            --template ~/vault/900_TemplaterNotes/new-fleeing-note.md
 
         # Apply fixes using template
-        validate-frontmatter /path/to/vault --template ~/vault/900_TemplaterNotes/new-fleeing-note.md --execute
+        validate-frontmatter /path/to/vault \\
+            --template ~/vault/900_TemplaterNotes/new-fleeing-note.md --execute
 
         # Legacy mode (auto-detect templates)
         validate-frontmatter /path/to/vault
@@ -250,12 +257,14 @@ def validate_frontmatter(
         file_repository = FileRepository(config)
         template_schema_repository = TemplateSchemaRepository(vault_path, config)
         validation_service = FrontmatterValidationService()
+        type_converter = YAMLTypeConverter()
 
         use_case = FrontmatterValidationUseCase(
             file_repository=file_repository,
             template_schema_repository=template_schema_repository,
             validation_service=validation_service,
             config=config,
+            type_converter=type_converter,
         )
 
         progress.update(task, description="Extracting template schemas...")

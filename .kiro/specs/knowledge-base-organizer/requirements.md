@@ -10,17 +10,20 @@ The application prioritizes frontmatter standardization, intelligent WikiLink ge
 
 ### Requirement 1
 
-**User Story:** As an Obsidian user, I want to validate and fix frontmatter in my notes according to predefined schemas, so that my knowledge base maintains consistent metadata structure.
+**User Story:** As an Obsidian user, I want to validate and fix frontmatter in my notes according to template-based schemas, so that my knowledge base maintains consistent metadata structure without corrupting existing valid frontmatter.
 
 #### Acceptance Criteria
 
 1. WHEN I provide a vault directory path THEN the system SHALL scan all markdown files recursively with configurable include/exclude patterns
 2. WHEN scanning files THEN the system SHALL parse frontmatter metadata (title, aliases, tags, id, date, publish status)
-3. WHEN validating frontmatter THEN the system SHALL check against predefined templates/schemas
-4. WHEN frontmatter is invalid THEN the system SHALL identify missing fields and rule violations
-5. WHEN I run interactive mode THEN the system SHALL prompt for corrections to frontmatter issues
-6. WHEN I run automatic mode THEN the system SHALL apply predefined fixes to frontmatter
-7. WHEN validation is complete THEN the system SHALL output results in CSV/JSON format for further processing
+3. WHEN running without `--template` option THEN the system SHALL only validate and report issues without modifying any files
+4. WHEN running with `--template <template_file_path>` option THEN the system SHALL use that template file's frontmatter as the schema reference
+5. WHEN a file's frontmatter already matches the template schema THEN the system SHALL not modify that file
+6. WHEN a file's frontmatter has valid values that don't conflict with the template THEN the system SHALL preserve those values
+7. WHEN frontmatter is invalid THEN the system SHALL identify missing fields and rule violations based on the template schema
+8. WHEN I run interactive mode THEN the system SHALL prompt for corrections to frontmatter issues
+9. WHEN I run automatic mode with `--execute` THEN the system SHALL apply template-based fixes to frontmatter while preserving existing valid values
+10. WHEN validation is complete THEN the system SHALL output results in CSV/JSON format for further processing
 
 ### Requirement 2
 
@@ -90,6 +93,21 @@ The application prioritizes frontmatter standardization, intelligent WikiLink ge
 4. WHEN configuring THEN the system SHALL allow table content processing to be enabled/disabled
 5. WHEN no config exists THEN the system SHALL use sensible defaults for standard Obsidian vaults
 6. WHEN config is invalid THEN the system SHALL provide clear validation error messages with examples
+
+### Requirement 12
+
+**User Story:** As an Obsidian user, I want the system to handle YAML type conversion intelligently, so that my frontmatter validation succeeds even when YAML automatically converts my ID numbers and dates to native types.
+
+#### Acceptance Criteria
+
+1. WHEN a frontmatter contains an `id` field with an integer value THEN the system SHALL convert it to a string before validation
+2. WHEN a frontmatter contains a `date` field with a date object THEN the system SHALL convert it to an ISO format string before validation
+3. WHEN a frontmatter contains boolean values that should be strings THEN the system SHALL convert them to string representations
+4. WHEN a frontmatter contains numeric values in fields expecting strings THEN the system SHALL convert them to string representations
+5. WHEN a frontmatter field is already a string THEN the system SHALL leave it unchanged
+6. WHEN a field contains null/None values THEN the system SHALL handle them appropriately based on the target schema
+7. WHEN a field contains values that cannot be converted to the target type THEN the system SHALL provide clear error messages
+8. WHEN type conversion occurs THEN the system SHALL log the conversion with original and converted values
 
 ### Requirement 7
 

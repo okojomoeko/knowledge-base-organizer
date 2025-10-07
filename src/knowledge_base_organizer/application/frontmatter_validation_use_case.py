@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict
 
 from ..domain.models import FieldType, ValidationResult
 from ..domain.services import FrontmatterValidationService
+from ..domain.services.yaml_type_converter import YAMLTypeConverter
 from ..infrastructure.config import ProcessingConfig
 from ..infrastructure.file_repository import FileRepository
 from ..infrastructure.template_schema_repository import TemplateSchemaRepository
@@ -55,12 +56,14 @@ class FrontmatterValidationUseCase:
         template_schema_repository: TemplateSchemaRepository,
         validation_service: FrontmatterValidationService,
         config: ProcessingConfig,
+        type_converter: YAMLTypeConverter | None = None,
     ) -> None:
         """Initialize frontmatter validation use case."""
         self.file_repository = file_repository
         self.template_schema_repository = template_schema_repository
         self.validation_service = validation_service
         self.config = config
+        self.type_converter = type_converter or YAMLTypeConverter()
 
     def execute(
         self, request: FrontmatterValidationRequest
@@ -124,36 +127,56 @@ class FrontmatterValidationUseCase:
         files_modified = 0
 
         for file in files:
-            # Validate frontmatter against template schema
-            validation_result = self.validation_service.validate_with_detailed_analysis(
-                file.frontmatter, schema, file.path
+            # Apply type conversion to handle YAML automatic conversion
+            frontmatter_dict = file.frontmatter.model_dump(exclude_unset=True)
+            converted_frontmatter, type_conversions = (
+                self.type_converter.convert_frontmatter_types(frontmatter_dict, schema)
             )
 
-            # Check if file needs modification
-            needs_modification = not validation_result.is_valid or bool(
-                validation_result.suggested_fixes
+            # Log type conversions if any were performed
+            if type_conversions:
+                self.type_converter.log_conversions(type_conversions)
+
+            # Create updated frontmatter with converted types
+            from ..domain.models import Frontmatter
+
+            updated_frontmatter = Frontmatter.model_validate(converted_frontmatter)
+
+            # Validate frontmatter against template schema
+            validation_result = self.validation_service.validate_with_detailed_analysis(
+                updated_frontmatter, schema, file.path
+            )
+
+            # Check if file needs modification (including type conversions)
+            needs_modification = (
+                not validation_result.is_valid
+                or bool(validation_result.suggested_fixes)
+                or bool(type_conversions)
             )
 
             # Apply fixes if not dry-run and file needs modification
-            if (
-                not request.dry_run
-                and needs_modification
-                and self._apply_template_based_fixes_safely(
+            if not request.dry_run and needs_modification:
+                # First apply type conversions to the file's frontmatter
+                if type_conversions:
+                    for field_name, value in converted_frontmatter.items():
+                        setattr(file.frontmatter, field_name, value)
+
+                # Then apply template-based fixes
+                if self._apply_template_based_fixes_safely(
                     file, schema, validation_result
-                )
-            ):
-                files_modified += 1
+                ):
+                    files_modified += 1
 
-                # Save the modified file with template order
-                template_order = list(schema.fields.keys())
-                self.file_repository.save_file(file, template_order=template_order)
+                    # Save the modified file with template order
+                    template_order = list(schema.fields.keys())
+                    self.file_repository.save_file(file, template_order=template_order)
 
-                # Re-validate after applying fixes
-                validation_result = (
-                    self.validation_service.validate_with_detailed_analysis(
-                        file.frontmatter, schema, file.path
+                    # Re-validate after applying fixes
+                    validation_result = (
+                        self.validation_service.validate_with_detailed_analysis(
+                            file.frontmatter, schema, file.path
+                        )
                     )
-                )
 
             results.append(validation_result)
 
@@ -235,17 +258,42 @@ class FrontmatterValidationUseCase:
             if template_type and template_type in schemas:
                 schema = schemas[template_type]
 
+                # Apply type conversion to handle YAML automatic conversion
+                frontmatter_dict = file.frontmatter.model_dump(exclude_unset=True)
+                converted_frontmatter, type_conversions = (
+                    self.type_converter.convert_frontmatter_types(
+                        frontmatter_dict, schema
+                    )
+                )
+
+                # Log type conversions if any were performed
+                if type_conversions:
+                    self.type_converter.log_conversions(type_conversions)
+
+                # Create updated frontmatter with converted types
+                from ..domain.models import Frontmatter
+
+                updated_frontmatter = Frontmatter.model_validate(converted_frontmatter)
+
                 # Use enhanced validation service
                 validation_result = (
                     self.validation_service.validate_with_detailed_analysis(
-                        file.frontmatter, schema, file.path
+                        updated_frontmatter, schema, file.path
                     )
                 )
 
                 # Apply fixes if not dry-run
-                if not request.dry_run and not validation_result.is_valid:
-                    # Use template-based comprehensive fixes
-                    self._apply_template_based_fixes(file, schema)
+                if not request.dry_run and (
+                    not validation_result.is_valid or type_conversions
+                ):
+                    # First apply type conversions to the file's frontmatter
+                    if type_conversions:
+                        for field_name, value in converted_frontmatter.items():
+                            setattr(file.frontmatter, field_name, value)
+
+                    # Then apply template-based comprehensive fixes
+                    if not validation_result.is_valid:
+                        self._apply_template_based_fixes(file, schema)
 
                     # Save the modified file with template order
                     template_order = list(schema.fields.keys())

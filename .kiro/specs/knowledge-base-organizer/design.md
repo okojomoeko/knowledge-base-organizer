@@ -112,13 +112,28 @@ classDiagram
 @app.command()
 def validate_frontmatter(
     vault_path: Path,
-    schema_path: Optional[Path] = None,
-    dry_run: bool = True,
-    output_format: OutputFormat = OutputFormat.JSON,
-    include_patterns: List[str] = None,
-    exclude_patterns: List[str] = None
+    template: Optional[Path] = typer.Option(None, "--template", help="Template file to use as schema reference"),
+    dry_run: bool = typer.Option(True, "--dry-run/--execute", help="Preview changes without applying them"),
+    output_format: OutputFormat = typer.Option(OutputFormat.JSON, help="Output format"),
+    include_patterns: Optional[List[str]] = typer.Option(None, "--include", help="Include file patterns"),
+    exclude_patterns: Optional[List[str]] = typer.Option(None, "--exclude", help="Exclude file patterns"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed output including type conversions")
 ) -> None:
-    """Validate and fix frontmatter according to schema"""
+    """Validate and fix frontmatter according to template schema
+
+    When --template is specified, uses that template file's frontmatter as the schema.
+    When --template is not specified, uses automatic template detection from template directories.
+
+    Examples:
+        # Validate using specific template
+        validate-frontmatter /path/to/vault --template ~/vault/900_TemplaterNotes/new-fleeing-note.md
+
+        # Apply fixes using template
+        validate-frontmatter /path/to/vault --template ~/vault/900_TemplaterNotes/new-fleeing-note.md --execute
+
+        # Legacy mode (auto-detect templates)
+        validate-frontmatter /path/to/vault
+    """
 
 @app.command()
 def auto_link(
@@ -445,6 +460,13 @@ class TemplateSchemaRepository:
 
         return schemas
 
+    def extract_schema_from_single_template(self, template_path: Path) -> FrontmatterSchema:
+        """Extract schema from a single template file specified via --template option"""
+        if not template_path.exists():
+            raise TemplateNotFoundError(f"Template file not found: {template_path}")
+
+        return self._parse_template_schema(template_path)
+
     def _parse_template_schema(self, template_path: Path) -> FrontmatterSchema:
         """Parse a template file and extract schema rules"""
         # Parse frontmatter from template
@@ -459,6 +481,89 @@ class TemplateSchemaRepository:
         # Check existing frontmatter patterns
         # Match against known template characteristics
         # Return best matching template name
+```
+
+### Type Conversion System
+
+**Type Converter for YAML Compatibility:**
+
+```python
+class YAMLTypeConverter:
+    def __init__(self, config: ProcessingConfig):
+        self.config = config
+        self.conversion_rules = self._load_conversion_rules()
+
+    def convert_frontmatter_types(
+        self,
+        frontmatter: Dict[str, Any],
+        schema: FrontmatterSchema
+    ) -> Tuple[Dict[str, Any], List[TypeConversion]]:
+        """Convert YAML types to match schema expectations"""
+        converted = {}
+        conversions = []
+
+        for field_name, value in frontmatter.items():
+            if field_name in schema.fields:
+                expected_type = schema.fields[field_name].field_type
+                converted_value, conversion = self._convert_field_value(
+                    field_name, value, expected_type
+                )
+                converted[field_name] = converted_value
+                if conversion:
+                    conversions.append(conversion)
+            else:
+                # Preserve unknown fields as-is
+                converted[field_name] = value
+
+        return converted, conversions
+
+    def _convert_field_value(
+        self,
+        field_name: str,
+        value: Any,
+        expected_type: Type
+    ) -> Tuple[Any, Optional[TypeConversion]]:
+        """Convert individual field value to expected type"""
+        original_value = value
+        original_type = type(value).__name__
+
+        # Handle special cases first
+        if field_name == 'id' and isinstance(value, int):
+            # Convert integer ID to string
+            converted_value = str(value)
+        elif field_name in ['date', 'published'] and hasattr(value, 'isoformat'):
+            # Convert datetime objects to ISO string
+            converted_value = value.isoformat()
+        elif expected_type == str and not isinstance(value, str):
+            # Convert any non-string to string
+            converted_value = str(value) if value is not None else None
+        elif expected_type == list and not isinstance(value, list):
+            # Convert single values to list
+            converted_value = [value] if value is not None else []
+        else:
+            # No conversion needed
+            converted_value = value
+
+        # Create conversion record if value changed
+        conversion = None
+        if converted_value != original_value:
+            conversion = TypeConversion(
+                field_name=field_name,
+                original_value=original_value,
+                original_type=original_type,
+                converted_value=converted_value,
+                converted_type=type(converted_value).__name__
+            )
+
+        return converted_value, conversion
+
+@dataclass
+class TypeConversion:
+    field_name: str
+    original_value: Any
+    original_type: str
+    converted_value: Any
+    converted_type: str
 ```
 
 ### Template Schema Rules
@@ -536,7 +641,7 @@ template_detection:
 
 ### Enhanced Validation Use Case
 
-**Updated Frontmatter Validation:**
+**Updated Template-Based Frontmatter Validation:**
 
 ```python
 class FrontmatterValidationUseCase:
@@ -544,14 +649,78 @@ class FrontmatterValidationUseCase:
         self,
         file_repository: FileRepository,
         template_schema_repository: TemplateSchemaRepository,
-        validation_service: ValidationService
+        validation_service: ValidationService,
+        type_converter: YAMLTypeConverter
     ):
         self.file_repository = file_repository
         self.template_schema_repository = template_schema_repository
         self.validation_service = validation_service
+        self.type_converter = type_converter
 
     def execute(self, request: FrontmatterValidationRequest) -> FrontmatterValidationResult:
-        # 1. Extract schemas from template files (SSoT)
+        # Handle template-based validation (new behavior)
+        if request.template_path:
+            return self._execute_template_based_validation(request)
+
+        # Handle legacy validation (existing behavior)
+        return self._execute_legacy_validation(request)
+
+    def _execute_template_based_validation(
+        self,
+        request: FrontmatterValidationRequest
+    ) -> FrontmatterValidationResult:
+        """Execute validation using specified template file"""
+        # 1. Extract schema from specified template file
+        schema = self.template_schema_repository.extract_schema_from_single_template(
+            request.template_path
+        )
+
+        # 2. Load all markdown files from vault
+        files = self.file_repository.load_vault(request.vault_path)
+
+        results = []
+        for file in files:
+            # 3. Apply type conversion to handle YAML automatic conversion
+            converted_frontmatter, type_conversions = self.type_converter.convert_frontmatter_types(
+                file.frontmatter.to_dict(), schema
+            )
+
+            # 4. Create updated file with converted frontmatter
+            updated_file = file.with_frontmatter(Frontmatter.from_dict(converted_frontmatter))
+
+            # 5. Validate against template schema
+            validation_result = schema.validate_frontmatter(updated_file.frontmatter)
+
+            # 6. Generate fixes if needed
+            fixes = []
+            if not validation_result.is_valid or type_conversions:
+                fixes = schema.suggest_fixes(updated_file.frontmatter)
+
+                # 7. Apply fixes if execute mode
+                if request.execute_mode and (fixes or type_conversions):
+                    self._apply_fixes_and_conversions(file, fixes, type_conversions)
+
+            results.append(ValidationResult(
+                file_path=file.path,
+                template_type=request.template_path.stem,
+                validation_result=validation_result,
+                type_conversions=type_conversions,
+                fixes_applied=fixes if request.execute_mode else [],
+                would_be_modified=bool(fixes or type_conversions)
+            ))
+
+        return FrontmatterValidationResult(
+            results=results,
+            template_used=request.template_path,
+            schema_used=schema
+        )
+
+    def _execute_legacy_validation(
+        self,
+        request: FrontmatterValidationRequest
+    ) -> FrontmatterValidationResult:
+        """Execute legacy validation (existing behavior)"""
+        # 1. Extract schemas from template directories (existing behavior)
         schemas = self.template_schema_repository.extract_schemas_from_templates()
 
         # 2. Load all markdown files from vault
@@ -565,25 +734,53 @@ class FrontmatterValidationUseCase:
             if template_type and template_type in schemas:
                 schema = schemas[template_type]
 
-                # 4. Validate frontmatter against detected template schema
-                validation_result = schema.validate_frontmatter(file.frontmatter)
+                # 4. Apply type conversion
+                converted_frontmatter, type_conversions = self.type_converter.convert_frontmatter_types(
+                    file.frontmatter.to_dict(), schema
+                )
 
-                # 5. Generate fixes if needed
-                if not validation_result.is_valid:
-                    fixes = schema.suggest_fixes(file.frontmatter)
+                # 5. Validate frontmatter against detected template schema
+                updated_file = file.with_frontmatter(Frontmatter.from_dict(converted_frontmatter))
+                validation_result = schema.validate_frontmatter(updated_file.frontmatter)
 
-                    # 6. Apply fixes if not dry-run
-                    if not request.dry_run:
-                        self._apply_fixes(file, fixes)
+                # 6. Generate fixes if needed
+                fixes = []
+                if not validation_result.is_valid or type_conversions:
+                    fixes = schema.suggest_fixes(updated_file.frontmatter)
+
+                    # 7. Apply fixes if not dry-run
+                    if request.execute_mode:
+                        self._apply_fixes_and_conversions(file, fixes, type_conversions)
 
                 results.append(ValidationResult(
                     file_path=file.path,
                     template_type=template_type,
                     validation_result=validation_result,
-                    fixes_applied=fixes if not request.dry_run else []
+                    type_conversions=type_conversions,
+                    fixes_applied=fixes if request.execute_mode else []
                 ))
 
         return FrontmatterValidationResult(results=results, schemas_used=schemas)
+
+    def _apply_fixes_and_conversions(
+        self,
+        file: MarkdownFile,
+        fixes: List[FieldFix],
+        type_conversions: List[TypeConversion]
+    ) -> None:
+        """Apply both fixes and type conversions to file"""
+        # Apply type conversions first
+        updated_frontmatter = file.frontmatter.to_dict()
+        for conversion in type_conversions:
+            updated_frontmatter[conversion.field_name] = conversion.converted_value
+
+        # Apply fixes
+        for fix in fixes:
+            updated_frontmatter[fix.field_name] = fix.suggested_value
+
+        # Save updated file
+        updated_file = file.with_frontmatter(Frontmatter.from_dict(updated_frontmatter))
+        self.file_repository.save_file(updated_file, backup=True)
 ```
 
 ### Benefits of Template-Based Approach
