@@ -34,9 +34,9 @@
         - Ensure error handling works with malformed files
         - _Requirements: 1.1_
 
-## Phase 2: Frontmatter Validation (Complete Feature)
+## Phase 2: Template-Based Frontmatter Validation (Complete Feature)
 
-- [ ] 3. Implement template-based frontmatter validation
+- [ ] 3. Implement template-based frontmatter validation with type conversion
     - [x] 3.1 Create template schema extraction system
         - Implement TemplateSchemaRepository to scan template directories
         - Parse frontmatter from template files (new-fleeing-note.md, booksearchtemplate.md)
@@ -49,17 +49,45 @@
         - Generate fix suggestions for non-conforming frontmatter
         - _Requirements: 1.3, 1.4, 1.5_
 
+    - [x] 3.2.1 Implement template-based validation with --template option
+        - Add single template file schema extraction
+        - Implement template-based validation that only modifies files when template is specified
+        - Add safety checks to preserve existing valid frontmatter
+        - _Requirements: 1.3, 1.4, 1.5, 1.6_
+
+    - [ ] 3.2.2 Implement YAML type conversion system
+        - Create YAMLTypeConverter for handling automatic YAML type conversion
+        - Add intelligent conversion of integers to strings for ID fields
+        - Add datetime to ISO string conversion for date fields
+        - Add logging of all type conversions performed
+        - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.8_
+
     - [x] 3.3 Create validate-frontmatter CLI command
         - Implement complete CLI command with dry-run and execute modes
         - Add interactive mode for reviewing and applying fixes
         - Support CSV/JSON output for automation
         - _Requirements: 1.5, 1.6, 5.1, 5.4_
 
+    - [ ] 3.3.1 Add --template option to validate-frontmatter CLI command
+        - Add --template option to specify template file path
+        - Implement template-based validation mode vs legacy auto-detection mode
+        - Add comprehensive error handling for invalid template paths
+        - Add verbose output showing type conversions and fixes applied
+        - _Requirements: 1.3, 1.4, 1.5, 1.6, 12.8_
+
     - [x] 3.4 Test frontmatter validation end-to-end
         - Test with various template types in test vault
         - Verify fix suggestions are accurate and safe
         - Test backup creation and rollback functionality
         - _Requirements: 1.1, 1.3, 1.6_
+
+    - [ ] 3.4.1 Test template-based validation with real vault data
+        - Test --template option with ~/work/myvault/900_TemplaterNotes/new-fleeing-note.md
+        - Verify that valid frontmatter (like AWS Summit note) is NOT modified
+        - Test type conversion with integer IDs and date objects
+        - Verify that only missing fields are added, existing valid values preserved
+        - Test dry-run vs execute mode behavior
+        - _Requirements: 1.3, 1.4, 1.5, 1.6, 12.1, 12.2, 12.3_
 
 ## Phase 3: Automatic Organization and Improvement (Priority Feature)
 
@@ -297,11 +325,17 @@
 ### ✅ User Value First - Knowledge Base Organization Focus
 
 - **Phase 1**: すぐに使える分析機能 ✅
-- **Phase 2**: 完全なfrontmatter検証機能 ✅
-- **Phase 3**: **自動整理・改善機能** (最優先) - frontmatter自動補完、一貫性修正
+- **Phase 2**: **完全なテンプレートベースfrontmatter検証機能** (最優先) - `--template`オプション、型変換、安全性確保
+- **Phase 3**: **自動整理・改善機能** - frontmatter自動補完、一貫性修正
 - **Phase 4**: **コンテンツ品質向上** - 孤立ノート検出、重複検出、品質改善
 - **Phase 5**: デッドリンク検出機能
 - **Phase 6**: 基本的な自動リンク生成機能
+
+### ✅ Critical Issue Resolution
+
+- **Phase 2.1**: `--template`オプションによる明示的なテンプレート指定
+- **Phase 2.2**: YAML型変換システムによる自動型変換の適切な処理
+- **Phase 2.4.1**: 実際のvaultデータでの安全性テスト（AWS Summitノートが破壊されないことを確認）
 
 ### ✅ Early Feedback
 

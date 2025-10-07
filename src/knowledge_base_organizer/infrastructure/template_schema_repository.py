@@ -47,6 +47,42 @@ class TemplateSchemaRepository:
 
         return schemas
 
+    def extract_schema_from_single_template(
+        self, template_path: Path
+    ) -> FrontmatterSchema:
+        """Extract schema from a single template file specified via --template option.
+
+        Args:
+            template_path: Path to the template file
+
+        Returns:
+            FrontmatterSchema extracted from the template
+
+        Raises:
+            FileNotFoundError: If template file doesn't exist
+            ValueError: If template file cannot be parsed
+        """
+        if not template_path.exists():
+            raise FileNotFoundError(f"Template file not found: {template_path}")
+
+        if not template_path.is_file():
+            raise ValueError(f"Template path is not a file: {template_path}")
+
+        if not template_path.suffix.lower() == ".md":
+            raise ValueError(
+                f"Template file must be a markdown file (.md): {template_path}"
+            )
+
+        try:
+            schema = self._parse_template_schema(template_path)
+            if not schema:
+                raise ValueError(
+                    f"Could not extract valid schema from template: {template_path}"
+                )
+            return schema
+        except Exception as e:
+            raise ValueError(f"Failed to parse template {template_path}: {e}") from e
+
     def _parse_template_schema(self, template_path: Path) -> FrontmatterSchema | None:
         """Parse a template file and extract schema rules."""
         try:

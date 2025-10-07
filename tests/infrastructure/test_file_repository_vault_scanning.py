@@ -290,6 +290,10 @@ invalid_yaml: [unclosed
 
             for relative_path_str, expected in test_cases:
                 file_path = temp_path / relative_path_str
+                # Create the file and its parent directories
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+                file_path.write_text("# Test content")
+
                 result = repo._should_include_file(file_path, temp_path)
                 assert result == expected, (
                     f"Failed for {relative_path_str}: expected {expected}, got {result}"

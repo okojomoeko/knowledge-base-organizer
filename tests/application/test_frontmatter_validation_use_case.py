@@ -141,18 +141,34 @@ This note has type errors.
 
     def test_execute_with_specific_template(self, use_case, temp_vault):
         """Test validation with specific template."""
+        # Create a template file for testing
+        template_path = temp_vault / "900_TemplaterNotes" / "new-fleeing-note.md"
+        template_path.parent.mkdir(parents=True, exist_ok=True)
+        template_path.write_text("""---
+title: <% tp.file.cursor(1) %>
+id: <% tp.file.creation_date("YYYYMMDDHHmmss") %>
+published: <% tp.file.creation_date("YYYY-MM-DD") %>
+category: []
+tags: []
+aliases: []
+image: ../../assets/images/svg/undraw/undraw_scrum_board.svg
+description: ""
+---
+# <% tp.file.cursor(2) %>
+""")
+
         request = FrontmatterValidationRequest(
             vault_path=temp_vault,
             dry_run=True,
-            template_name="new-fleeing-note",
+            template_path=template_path,
         )
 
         result = use_case.execute(request)
 
-        # All files should be validated against the specified template
-        for validation_result in result.results:
-            if validation_result.template_type:
-                assert validation_result.template_type == "new-fleeing-note"
+        # Should have template_used and schema_used set
+        assert result.template_used == template_path
+        assert result.schema_used is not None
+        assert result.schema_used.template_name == "new-fleeing-note"
 
     def test_execute_no_templates_found(self, config):
         """Test behavior when no templates are found."""

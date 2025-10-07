@@ -193,8 +193,8 @@ def validate_frontmatter(
     exclude_patterns: list[str] | None = typer.Option(
         None, "--exclude", help="Exclude file patterns"
     ),
-    template_name: str | None = typer.Option(
-        None, "--template", help="Validate against specific template only"
+    template_path: Path | None = typer.Option(
+        None, "--template", help="Path to template file to use as schema reference"
     ),
     output_file: Path | None = typer.Option(
         None, "--output", "-o", help="Output file for CSV/JSON results"
@@ -203,11 +203,22 @@ def validate_frontmatter(
 ) -> None:
     """Validate and fix frontmatter according to template schemas.
 
-    This command validates frontmatter in markdown files against template schemas
-    extracted from template directories. It can run in dry-run mode to preview
-    changes, or in execute mode to apply fixes automatically.
+    This command validates frontmatter in markdown files against template schemas.
+    When --template is specified, uses that template file's frontmatter as the schema.
+    When --template is not specified, uses automatic template detection from template directories.
 
+    The command can run in dry-run mode to preview changes, or in execute mode to apply fixes automatically.
     Interactive mode allows reviewing each fix before applying it.
+
+    Examples:
+        # Validate using specific template
+        validate-frontmatter /path/to/vault --template ~/vault/900_TemplaterNotes/new-fleeing-note.md
+
+        # Apply fixes using template
+        validate-frontmatter /path/to/vault --template ~/vault/900_TemplaterNotes/new-fleeing-note.md --execute
+
+        # Legacy mode (auto-detect templates)
+        validate-frontmatter /path/to/vault
     """
 
     if verbose:
@@ -255,7 +266,7 @@ def validate_frontmatter(
             dry_run=dry_run,
             include_patterns=include_patterns,
             exclude_patterns=exclude_patterns,
-            template_name=template_name,
+            template_path=template_path,
         )
 
         progress.update(task, description="Validating frontmatter...")
@@ -715,17 +726,19 @@ def _output_validation_results(
         # Prepare CSV output
         csv_data = []
         for r in result.results:
-            csv_data.append({
-                "file_path": str(r.file_path),
-                "template_type": r.template_type or "",
-                "is_valid": r.is_valid,
-                "missing_fields": "; ".join(r.missing_fields),
-                "invalid_fields": "; ".join([
-                    f"{k}: {v}" for k, v in r.invalid_fields.items()
-                ]),
-                "warnings": "; ".join(r.warnings),
-                "suggested_fixes_count": len(r.suggested_fixes),
-            })
+            csv_data.append(
+                {
+                    "file_path": str(r.file_path),
+                    "template_type": r.template_type or "",
+                    "is_valid": r.is_valid,
+                    "missing_fields": "; ".join(r.missing_fields),
+                    "invalid_fields": "; ".join(
+                        [f"{k}: {v}" for k, v in r.invalid_fields.items()]
+                    ),
+                    "warnings": "; ".join(r.warnings),
+                    "suggested_fixes_count": len(r.suggested_fixes),
+                }
+            )
 
         if output_file:
             with output_file.open("w", newline="", encoding="utf-8") as f:
@@ -968,13 +981,15 @@ def _filter_and_sort_dead_links(
     filtered_result.files_with_dead_links = len({dl.source_file for dl in dead_links})
 
     # Update summary
-    filtered_result.summary.update({
-        "total_dead_links": len(dead_links),
-        "files_with_dead_links": filtered_result.files_with_dead_links,
-        "wikilink_dead_links": dead_links_by_type.get("wikilink", 0),
-        "regular_link_dead_links": dead_links_by_type.get("regular_link", 0),
-        "link_ref_def_dead_links": dead_links_by_type.get("link_ref_def", 0),
-    })
+    filtered_result.summary.update(
+        {
+            "total_dead_links": len(dead_links),
+            "files_with_dead_links": filtered_result.files_with_dead_links,
+            "wikilink_dead_links": dead_links_by_type.get("wikilink", 0),
+            "regular_link_dead_links": dead_links_by_type.get("regular_link", 0),
+            "link_ref_def_dead_links": dead_links_by_type.get("link_ref_def", 0),
+        }
+    )
 
     return filtered_result
 
@@ -1022,14 +1037,16 @@ def _output_dead_link_results(
         # Prepare CSV output
         csv_data = []
         for dl in result.dead_links:
-            csv_data.append({
-                "source_file": dl.source_file,
-                "link_text": dl.link_text,
-                "link_type": dl.link_type,
-                "line_number": dl.line_number,
-                "target": dl.target,
-                "suggested_fixes": "; ".join(dl.suggested_fixes),
-            })
+            csv_data.append(
+                {
+                    "source_file": dl.source_file,
+                    "link_text": dl.link_text,
+                    "link_type": dl.link_type,
+                    "line_number": dl.line_number,
+                    "target": dl.target,
+                    "suggested_fixes": "; ".join(dl.suggested_fixes),
+                }
+            )
 
         if output_file:
             with output_file.open("w", newline="", encoding="utf-8") as f:
@@ -1146,16 +1163,18 @@ def _output_auto_link_results(
         # Prepare CSV output
         csv_data = []
         for update in result.file_updates:
-            csv_data.append({
-                "file_path": str(update.file_path),
-                "update_type": update.update_type,
-                "links_added": len(update.applied_replacements)
-                if update.applied_replacements
-                else 0,
-                "aliases_added": len(update.frontmatter_changes.get("aliases", []))
-                if update.frontmatter_changes
-                else 0,
-            })
+            csv_data.append(
+                {
+                    "file_path": str(update.file_path),
+                    "update_type": update.update_type,
+                    "links_added": len(update.applied_replacements)
+                    if update.applied_replacements
+                    else 0,
+                    "aliases_added": len(update.frontmatter_changes.get("aliases", []))
+                    if update.frontmatter_changes
+                    else 0,
+                }
+            )
 
         if output_file:
             with output_file.open("w", newline="", encoding="utf-8") as f:
