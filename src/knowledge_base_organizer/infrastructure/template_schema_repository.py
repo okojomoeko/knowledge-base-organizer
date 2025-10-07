@@ -1,6 +1,7 @@
 """Template schema repository for extracting schemas from template files."""
 
 import re
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any
 
@@ -68,8 +69,8 @@ class TemplateSchemaRepository:
             if not isinstance(frontmatter_data, dict):
                 return None
 
-            # Convert frontmatter to schema fields
-            fields = {}
+            # Convert frontmatter to schema fields (preserve order)
+            fields = OrderedDict()
             for field_name, field_value in frontmatter_data.items():
                 schema_field = self._create_schema_field(
                     field_name, field_value, frontmatter_text
@@ -100,6 +101,10 @@ class TemplateSchemaRepository:
         # Determine field type based on value and template patterns
         field_type = self._determine_field_type(field_value, template_variable)
 
+        # Special handling for known array fields that might be None in template
+        if field_value is None and field_name in ("category", "tags", "aliases"):
+            field_type = FieldType.ARRAY
+
         # Determine if field is required (heuristic-based)
         required = self._is_field_required(field_name, field_value, template_variable)
 
@@ -107,6 +112,10 @@ class TemplateSchemaRepository:
         default_value = self._get_default_value(
             field_value, field_type, template_variable
         )
+
+        # Special handling for array fields that are None in template
+        if field_value is None and field_type == FieldType.ARRAY:
+            default_value = []
 
         # Create validation pattern if applicable
         validation_pattern = self._create_validation_pattern(field_name, field_type)
@@ -189,7 +198,11 @@ class TemplateSchemaRepository:
     ) -> bool:
         """Determine if a field is required based on heuristics."""
         # Core fields are typically required
-        core_fields = {"title", "id", "date"}
+        core_fields = {
+            "title",
+            "id",
+            "published",
+        }  # published is required in new-fleeing-note
         if field_name in core_fields:
             return True
 
@@ -210,6 +223,10 @@ class TemplateSchemaRepository:
             for pattern in placeholder_patterns:
                 if re.match(pattern, field_value, re.IGNORECASE):
                     return True
+
+        # Special handling for specific fields
+        if field_name in ("image", "description", "category"):
+            return False  # These are optional but should be included
 
         # Arrays and booleans are often optional
         if isinstance(field_value, (list, bool)):
@@ -244,6 +261,14 @@ class TemplateSchemaRepository:
             )
             if not is_placeholder:
                 return field_value
+
+        # Special handling for specific template fields
+        if isinstance(field_value, str) and field_value == "None":
+            return None
+
+        # Use actual template values as defaults
+        if field_value is not None:
+            return field_value
 
         # Type-specific defaults
         defaults = {

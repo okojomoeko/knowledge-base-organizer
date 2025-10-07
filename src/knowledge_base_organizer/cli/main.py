@@ -715,19 +715,17 @@ def _output_validation_results(
         # Prepare CSV output
         csv_data = []
         for r in result.results:
-            csv_data.append(
-                {
-                    "file_path": str(r.file_path),
-                    "template_type": r.template_type or "",
-                    "is_valid": r.is_valid,
-                    "missing_fields": "; ".join(r.missing_fields),
-                    "invalid_fields": "; ".join(
-                        [f"{k}: {v}" for k, v in r.invalid_fields.items()]
-                    ),
-                    "warnings": "; ".join(r.warnings),
-                    "suggested_fixes_count": len(r.suggested_fixes),
-                }
-            )
+            csv_data.append({
+                "file_path": str(r.file_path),
+                "template_type": r.template_type or "",
+                "is_valid": r.is_valid,
+                "missing_fields": "; ".join(r.missing_fields),
+                "invalid_fields": "; ".join([
+                    f"{k}: {v}" for k, v in r.invalid_fields.items()
+                ]),
+                "warnings": "; ".join(r.warnings),
+                "suggested_fixes_count": len(r.suggested_fixes),
+            })
 
         if output_file:
             with output_file.open("w", newline="", encoding="utf-8") as f:
@@ -970,15 +968,13 @@ def _filter_and_sort_dead_links(
     filtered_result.files_with_dead_links = len({dl.source_file for dl in dead_links})
 
     # Update summary
-    filtered_result.summary.update(
-        {
-            "total_dead_links": len(dead_links),
-            "files_with_dead_links": filtered_result.files_with_dead_links,
-            "wikilink_dead_links": dead_links_by_type.get("wikilink", 0),
-            "regular_link_dead_links": dead_links_by_type.get("regular_link", 0),
-            "link_ref_def_dead_links": dead_links_by_type.get("link_ref_def", 0),
-        }
-    )
+    filtered_result.summary.update({
+        "total_dead_links": len(dead_links),
+        "files_with_dead_links": filtered_result.files_with_dead_links,
+        "wikilink_dead_links": dead_links_by_type.get("wikilink", 0),
+        "regular_link_dead_links": dead_links_by_type.get("regular_link", 0),
+        "link_ref_def_dead_links": dead_links_by_type.get("link_ref_def", 0),
+    })
 
     return filtered_result
 
@@ -1026,16 +1022,14 @@ def _output_dead_link_results(
         # Prepare CSV output
         csv_data = []
         for dl in result.dead_links:
-            csv_data.append(
-                {
-                    "source_file": dl.source_file,
-                    "link_text": dl.link_text,
-                    "link_type": dl.link_type,
-                    "line_number": dl.line_number,
-                    "target": dl.target,
-                    "suggested_fixes": "; ".join(dl.suggested_fixes),
-                }
-            )
+            csv_data.append({
+                "source_file": dl.source_file,
+                "link_text": dl.link_text,
+                "link_type": dl.link_type,
+                "line_number": dl.line_number,
+                "target": dl.target,
+                "suggested_fixes": "; ".join(dl.suggested_fixes),
+            })
 
         if output_file:
             with output_file.open("w", newline="", encoding="utf-8") as f:
@@ -1152,18 +1146,16 @@ def _output_auto_link_results(
         # Prepare CSV output
         csv_data = []
         for update in result.file_updates:
-            csv_data.append(
-                {
-                    "file_path": str(update.file_path),
-                    "update_type": update.update_type,
-                    "links_added": len(update.applied_replacements)
-                    if update.applied_replacements
-                    else 0,
-                    "aliases_added": len(update.frontmatter_changes.get("aliases", []))
-                    if update.frontmatter_changes
-                    else 0,
-                }
-            )
+            csv_data.append({
+                "file_path": str(update.file_path),
+                "update_type": update.update_type,
+                "links_added": len(update.applied_replacements)
+                if update.applied_replacements
+                else 0,
+                "aliases_added": len(update.frontmatter_changes.get("aliases", []))
+                if update.frontmatter_changes
+                else 0,
+            })
 
         if output_file:
             with output_file.open("w", newline="", encoding="utf-8") as f:

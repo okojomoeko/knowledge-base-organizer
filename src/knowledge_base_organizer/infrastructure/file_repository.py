@@ -70,13 +70,19 @@ class FileRepository:
 
         return markdown_file
 
-    def save_file(self, file: MarkdownFile, *, backup: bool = True) -> None:
+    def save_file(
+        self,
+        file: MarkdownFile,
+        *,
+        backup: bool = True,
+        template_order: list[str] | None = None,
+    ) -> None:
         """Save file with optional backup creation."""
         if backup and self.config.backup_enabled:
             self.create_backup(file.path)
 
         # Reconstruct full content with frontmatter
-        full_content = self._reconstruct_content(file)
+        full_content = self._reconstruct_content(file, template_order)
         file.path.write_text(full_content, encoding="utf-8")
 
     def create_backup(self, file_path: Path) -> Path:
@@ -248,13 +254,158 @@ class FileRepository:
         # Save updated content
         file_path.write_text(full_content, encoding="utf-8")
 
-    def _reconstruct_content(self, file: MarkdownFile) -> str:
+    def _reconstruct_content(
+        self, file: MarkdownFile, template_order: list[str] | None = None
+    ) -> str:
         """Reconstruct full content with frontmatter."""
-        frontmatter_dict = file.frontmatter.model_dump(exclude_unset=True)
+        if template_order:
+            frontmatter_dict = file.frontmatter.model_dump_ordered(
+                template_order, exclude_unset=True
+            )
+        else:
+            frontmatter_dict = file.frontmatter.model_dump(exclude_unset=True)
 
         if frontmatter_dict:
-            frontmatter_yaml = yaml.dump(
-                frontmatter_dict, default_flow_style=False, allow_unicode=True
+            # Use custom YAML formatting to preserve template style
+            frontmatter_yaml = self._format_frontmatter_yaml(
+                frontmatter_dict, template_order
             )
             return f"---\n{frontmatter_yaml}---\n{file.content}"
         return file.content
+
+    def _format_frontmatter_yaml(
+        self, frontmatter_dict: dict[str, Any], template_order: list[str] | None = None
+    ) -> str:
+        """Format frontmatter YAML with template-style formatting."""
+        lines = []
+
+        # Process fields in template order if provided
+        fields_to_process = (
+            template_order if template_order else list(frontmatter_dict.keys())
+        )
+
+        for field_name in fields_to_process:
+            if field_name not in frontmatter_dict:
+                continue
+
+            value = frontmatter_dict[field_name]
+
+            # Format based on value type and template expectations
+            if isinstance(value, list):
+                # Always use inline array format to match template style
+                if not value:  # Empty array
+                    lines.append(f"{field_name}: []")
+                else:
+                    # Format as inline array: [item1, item2, item3]
+                    formatted_items = []
+                    for item in value:
+                        if self._needs_quoting(str(item), field_name):
+                            formatted_items.append(f'"{item}"')
+                        else:
+                            formatted_items.append(str(item))
+                    lines.append(f"{field_name}: [{','.join(formatted_items)}]")
+            elif isinstance(value, bool):
+                lines.append(f"{field_name}: {str(value).lower()}")
+            elif value is None:
+                lines.append(f"{field_name}: null")
+            elif isinstance(value, str):
+                # Handle empty strings (like description field in template)
+                if value == "":
+                    lines.append(f"{field_name}:")
+                # Don't quote simple strings unless they contain special characters
+                elif self._needs_quoting(value, field_name):
+                    lines.append(f"{field_name}: '{value}'")
+                else:
+                    lines.append(f"{field_name}: {value}")
+            else:
+                lines.append(f"{field_name}: {value}")
+
+        # Add any remaining fields not in template order
+        if template_order:
+            for field_name, value in frontmatter_dict.items():
+                if field_name not in template_order:
+                    if isinstance(value, list):
+                        # Always use inline array format
+                        if not value:
+                            lines.append(f"{field_name}: []")
+                        else:
+                            formatted_items = []
+                            for item in value:
+                                if self._needs_quoting(str(item), field_name):
+                                    formatted_items.append(f'"{item}"')
+                                else:
+                                    formatted_items.append(str(item))
+                            lines.append(f"{field_name}: [{','.join(formatted_items)}]")
+                    elif isinstance(value, bool):
+                        lines.append(f"{field_name}: {str(value).lower()}")
+                    elif value is None:
+                        lines.append(f"{field_name}: null")
+                    elif isinstance(value, str):
+                        # Handle empty strings
+                        if value == "":
+                            lines.append(f"{field_name}:")
+                        elif self._needs_quoting(value, field_name):
+                            lines.append(f"{field_name}: '{value}'")
+                        else:
+                            lines.append(f"{field_name}: {value}")
+                    else:
+                        lines.append(f"{field_name}: {value}")
+
+        return "\n".join(lines) + "\n"
+
+    def _needs_quoting(self, value: str, field_name: str = "") -> bool:
+        """Determine if a string value needs quoting in YAML."""
+        # Special handling for specific fields that should not be quoted
+        # even if they look like numbers
+        numeric_fields_no_quote = {"id"}
+        if field_name in numeric_fields_no_quote:
+            # Only quote if contains special characters, not for numeric values
+            special_chars = [
+                ":",
+                "[",
+                "]",
+                "{",
+                "}",
+                "|",
+                ">",
+                "#",
+                "&",
+                "*",
+                "!",
+                "%",
+                "@",
+                "`",
+            ]
+            return any(char in value for char in special_chars)
+
+        # Quote if contains special YAML characters or looks like a number/boolean
+        special_chars = [
+            ":",
+            "[",
+            "]",
+            "{",
+            "}",
+            "|",
+            ">",
+            "#",
+            "&",
+            "*",
+            "!",
+            "%",
+            "@",
+            "`",
+        ]
+        if any(char in value for char in special_chars):
+            return True
+
+        # Quote if looks like a number or boolean
+        if value.lower() in ("true", "false", "null", "yes", "no", "on", "off"):
+            return True
+
+        try:
+            float(value)
+            return True
+        except ValueError:
+            pass
+
+        return False

@@ -1,6 +1,7 @@
 """Domain models for knowledge base organizer."""
 
 import re
+from collections import OrderedDict
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,72 @@ class Frontmatter(BaseModel):
     def remove_duplicates(cls, v: list[str]) -> list[str]:
         """Remove duplicates while preserving order."""
         return list(dict.fromkeys(v))
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def convert_id_to_string(cls, v: Any) -> str | None:
+        """Convert id to string if it's not None."""
+        if v is None:
+            return None
+        return str(v)
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def convert_date_to_string(cls, v: Any) -> str | None:
+        """Convert date to string if it's not None."""
+        if v is None:
+            return None
+        # Handle datetime.date objects
+        if hasattr(v, "isoformat"):
+            return v.isoformat()
+        return str(v)
+
+    @field_validator("publish", mode="before")
+    @classmethod
+    def convert_publish_to_bool(cls, v: Any) -> bool:
+        """Convert publish to boolean, handling various input types."""
+        if v is None:
+            return False
+        # Handle datetime objects (some files might have dates in publish field)
+        if hasattr(v, "isoformat"):
+            # If it's a date, treat as True (published)
+            return True
+        # Handle string values
+        if isinstance(v, str):
+            return v.lower() in ("true", "yes", "1", "on")
+        # Handle boolean and other types
+        return bool(v)
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def convert_title_to_string(cls, v: Any) -> str | None:
+        """Convert title to string, handling various input types."""
+        if v is None:
+            return None
+        # Handle list (some files might have title as array)
+        if isinstance(v, list):
+            return v[0] if v else None
+        return str(v)
+
+    def model_dump_ordered(
+        self, template_order: list[str] | None = None, **kwargs
+    ) -> OrderedDict[str, Any]:
+        """Return model data as OrderedDict with specified field order."""
+        data = self.model_dump(**kwargs)
+
+        if template_order:
+            ordered_data = OrderedDict()
+            # Add fields in template order first
+            for field_name in template_order:
+                if field_name in data:
+                    ordered_data[field_name] = data[field_name]
+            # Add any remaining fields
+            for field_name, value in data.items():
+                if field_name not in ordered_data:
+                    ordered_data[field_name] = value
+            return ordered_data
+
+        return OrderedDict(data)
 
 
 class TextPosition(BaseModel):

@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from ..domain.models import ValidationResult
+from ..domain.models import FieldType, ValidationResult
 from ..domain.services import FrontmatterValidationService
 from ..infrastructure.config import ProcessingConfig
 from ..infrastructure.file_repository import FileRepository
@@ -122,10 +122,19 @@ class FrontmatterValidationUseCase:
 
                 # Apply fixes if not dry-run
                 if not request.dry_run and not validation_result.is_valid:
-                    fixes = self.validation_service.generate_comprehensive_fixes(
-                        file.frontmatter, schema
+                    # Use template-based comprehensive fixes
+                    self._apply_template_based_fixes(file, schema)
+
+                    # Save the modified file with template order
+                    template_order = list(schema.fields.keys())
+                    self.file_repository.save_file(file, template_order=template_order)
+
+                    # Re-validate after applying fixes
+                    validation_result = (
+                        self.validation_service.validate_with_detailed_analysis(
+                            file.frontmatter, schema, file.path
+                        )
                     )
-                    self._apply_fixes(file, fixes)
 
                 results.append(validation_result)
 
@@ -170,9 +179,93 @@ class FrontmatterValidationUseCase:
 
     def _apply_fixes(self, file: Any, fixes: list[Any]) -> None:
         """Apply suggested fixes to a file's frontmatter."""
-        # This is a placeholder for actual fix application
-        # In a real implementation, this would modify the file's frontmatter
-        # and save it back to disk
+        if not fixes:
+            return
+
+        # Apply fixes to the file's frontmatter
+        for fix in fixes:
+            if fix.fix_type in ("add", "modify"):
+                setattr(file.frontmatter, fix.field_name, fix.suggested_value)
+
+        # Save the modified file back to disk
+        self.file_repository.save_file(file)
+
+    def _apply_template_based_fixes(self, file: Any, schema: Any) -> None:
+        """Apply comprehensive template-based fixes to frontmatter."""
+        # Get current frontmatter as dict
+        current_frontmatter = file.frontmatter.model_dump(exclude_unset=True)
+
+        # Create new frontmatter based on template schema
+        new_frontmatter = {}
+
+        # Add all template fields in template order
+        for field_name, field_def in schema.fields.items():
+            if field_name in current_frontmatter:
+                # Keep existing value if it has content, but ensure proper type
+                value = current_frontmatter[field_name]
+                if value is not None and (
+                    not isinstance(value, list) or len(value) > 0
+                ):
+                    # Keep existing non-empty value
+                    new_frontmatter[field_name] = (
+                        self._convert_value_to_template_format(value, field_def)
+                    )
+                elif field_def.required or field_def.default_value is not None:
+                    # Use default for empty/null values if field is required or has default
+                    if field_name == "published" and "date" in current_frontmatter:
+                        new_frontmatter[field_name] = current_frontmatter["date"]
+                    else:
+                        new_frontmatter[field_name] = field_def.default_value
+                else:
+                    # For optional fields without defaults, keep the existing value even if empty
+                    new_frontmatter[field_name] = (
+                        self._convert_value_to_template_format(value, field_def)
+                    )
+            elif field_def.required or field_def.default_value is not None:
+                # Add missing required fields or fields with defaults
+                if field_name == "published" and "date" in current_frontmatter:
+                    # Use date field value for published if available
+                    new_frontmatter[field_name] = current_frontmatter["date"]
+                else:
+                    new_frontmatter[field_name] = field_def.default_value
+            # Add optional fields with appropriate defaults
+            elif field_name in ("image", "description", "category"):
+                if field_name == "image":
+                    new_frontmatter[field_name] = (
+                        "../../assets/images/svg/undraw/undraw_scrum_board.svg"
+                    )
+                elif field_name == "description":
+                    new_frontmatter[field_name] = ""
+                elif field_name == "category":
+                    new_frontmatter[field_name] = []
+
+        # Update the file's frontmatter with new structure
+        for field_name, value in new_frontmatter.items():
+            setattr(file.frontmatter, field_name, value)
+
+        # Remove fields not in template (optional - could be configurable)
+        frontmatter_dict = file.frontmatter.model_dump(exclude_unset=True)
+        for field_name in list(frontmatter_dict.keys()):
+            if field_name not in schema.fields:
+                # Keep unexpected fields for now, but could remove them
+                pass
+
+    def _convert_value_to_template_format(self, value: Any, field_def: Any) -> Any:
+        """Convert value to match template field format."""
+        if field_def.field_type == FieldType.ARRAY and not isinstance(value, list):
+            if isinstance(value, str):
+                return [item.strip() for item in value.split(",")]
+            return [value]
+
+        if field_def.field_type == FieldType.STRING and not isinstance(value, str):
+            return str(value)
+
+        if field_def.field_type == FieldType.BOOLEAN and not isinstance(value, bool):
+            if isinstance(value, str):
+                return value.lower() in ("true", "yes", "1", "on")
+            return bool(value)
+
+        return value
 
     def _generate_summary(
         self, results: list[ValidationResult], schemas: dict[str, Any]

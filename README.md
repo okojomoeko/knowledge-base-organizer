@@ -192,6 +192,7 @@ uv run python -m knowledge_base_organizer detect-dead-links /path/to/vault --out
 1. **必ずバックアップを取る**: 重要なデータは事前にバックアップ
 2. **小規模から開始**: `--max-files 5` などで少数のファイルから試す
 3. **dry-runで確認**: `--dry-run` で変更内容を事前確認
+4. **テンプレート検証の注意**: 現在のテンプレート自動検出は改善中のため、`analyze`コマンドから始めることを推奨
 
 ### 大規模ボルトでの使用
 
@@ -224,6 +225,20 @@ uv run python -m knowledge_base_organizer auto-link /path/to/vault \
 ```bash
 # 詳細なエラー情報を確認
 uv run python -m knowledge_base_organizer validate-frontmatter /path/to/vault --dry-run --verbose
+
+# 特定のテンプレートのみ検証（テンプレート自動検出に問題がある場合）
+uv run python -m knowledge_base_organizer validate-frontmatter /path/to/vault --template specific-template --dry-run
+```
+
+**Q: 全ファイルが同じテンプレートとして検出される**
+
+```bash
+# 現在のテンプレート検出は改善中です。一時的な回避策：
+# 1. 特定のテンプレートを指定して検証
+uv run python -m knowledge_base_organizer validate-frontmatter /path/to/vault --template fleeting-note --dry-run
+
+# 2. または、基本的な分析のみ実行
+uv run python -m knowledge_base_organizer analyze /path/to/vault
 ```
 
 **Q: 自動リンク生成で意図しないリンクが作られる**
