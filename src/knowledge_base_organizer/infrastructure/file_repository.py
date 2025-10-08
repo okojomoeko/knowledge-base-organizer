@@ -177,7 +177,7 @@ class FileRepository:
                 normalized_key = "aliases"
             elif normalized_key in {"created", "created_date", "creation_date"}:
                 normalized_key = "date"
-            elif normalized_key in {"published", "public"}:
+            elif normalized_key in {"public"}:
                 normalized_key = "publish"
             else:
                 normalized_key = key  # Keep original case for other fields
@@ -189,6 +189,9 @@ class FileRepository:
             elif normalized_key == "publish" and isinstance(value, str):
                 # Convert string to boolean
                 normalized[normalized_key] = value.lower() in {"true", "yes", "1"}
+            elif value is None and normalized_key in {"description"}:
+                # Convert None to empty string for description field
+                normalized[normalized_key] = ""
             else:
                 normalized[normalized_key] = value
 
@@ -199,7 +202,7 @@ class FileRepository:
         valid_fields = {}
 
         # Try each field individually
-        for field in ["title", "aliases", "tags", "id", "date", "publish"]:
+        for field in ["title", "aliases", "tags", "id", "date", "published", "publish"]:
             if field in data:
                 try:
                     # Test if this field would be valid
@@ -260,10 +263,12 @@ class FileRepository:
         """Reconstruct full content with frontmatter."""
         if template_order:
             frontmatter_dict = file.frontmatter.model_dump_ordered(
-                template_order, exclude_unset=True
+                template_order, exclude_unset=True, exclude_none=True
             )
         else:
-            frontmatter_dict = file.frontmatter.model_dump(exclude_unset=True)
+            frontmatter_dict = file.frontmatter.model_dump(
+                exclude_unset=True, exclude_none=True
+            )
 
         if frontmatter_dict:
             # Use custom YAML formatting to preserve template style
@@ -307,14 +312,14 @@ class FileRepository:
             elif isinstance(value, bool):
                 lines.append(f"{field_name}: {str(value).lower()}")
             elif value is None:
-                lines.append(f"{field_name}: null")
+                lines.append(f"{field_name}:")
             elif isinstance(value, str):
                 # Handle empty strings (like description field in template)
                 if value == "":
                     lines.append(f"{field_name}:")
                 # Don't quote simple strings unless they contain special characters
                 elif self._needs_quoting(value, field_name):
-                    lines.append(f"{field_name}: '{value}'")
+                    lines.append(f'{field_name}: "{value}"')
                 else:
                     lines.append(f"{field_name}: {value}")
             else:
@@ -339,13 +344,13 @@ class FileRepository:
                     elif isinstance(value, bool):
                         lines.append(f"{field_name}: {str(value).lower()}")
                     elif value is None:
-                        lines.append(f"{field_name}: null")
+                        lines.append(f"{field_name}:")
                     elif isinstance(value, str):
                         # Handle empty strings
                         if value == "":
                             lines.append(f"{field_name}:")
                         elif self._needs_quoting(value, field_name):
-                            lines.append(f"{field_name}: '{value}'")
+                            lines.append(f'{field_name}: "{value}"')
                         else:
                             lines.append(f"{field_name}: {value}")
                     else:
@@ -355,6 +360,11 @@ class FileRepository:
 
     def _needs_quoting(self, value: str, field_name: str = "") -> bool:
         """Determine if a string value needs quoting in YAML."""
+        # Special handling for fields that should always be quoted
+        always_quote_fields = {"image"}
+        if field_name in always_quote_fields:
+            return True
+
         # Special handling for specific fields that should not be quoted
         # even if they look like numbers
         numeric_fields_no_quote = {"id"}

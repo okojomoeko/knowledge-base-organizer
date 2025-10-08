@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from ..domain.models import FieldType, ValidationResult
+from ..domain.models import FieldType, Frontmatter, ValidationResult
 from ..domain.services import FrontmatterValidationService
 from ..domain.services.yaml_type_converter import YAMLTypeConverter
 from ..infrastructure.config import ProcessingConfig
@@ -138,8 +138,6 @@ class FrontmatterValidationUseCase:
                 self.type_converter.log_conversions(type_conversions)
 
             # Create updated frontmatter with converted types
-            from ..domain.models import Frontmatter
-
             updated_frontmatter = Frontmatter.model_validate(converted_frontmatter)
 
             # Validate frontmatter against template schema
@@ -147,11 +145,17 @@ class FrontmatterValidationUseCase:
                 updated_frontmatter, schema, file.path
             )
 
-            # Check if file needs modification (including type conversions)
+            # Check if file needs modification (including type conversions and template compliance)
+            frontmatter_dict = file.frontmatter.model_dump(exclude_unset=True)
+            is_template_compliant = self._is_template_compliant(
+                frontmatter_dict, schema
+            )
+
             needs_modification = (
                 not validation_result.is_valid
                 or bool(validation_result.suggested_fixes)
                 or bool(type_conversions)
+                or not is_template_compliant
             )
 
             # Apply fixes if not dry-run and file needs modification
@@ -271,8 +275,6 @@ class FrontmatterValidationUseCase:
                     self.type_converter.log_conversions(type_conversions)
 
                 # Create updated frontmatter with converted types
-                from ..domain.models import Frontmatter
-
                 updated_frontmatter = Frontmatter.model_validate(converted_frontmatter)
 
                 # Use enhanced validation service
@@ -456,55 +458,43 @@ class FrontmatterValidationUseCase:
         # Track if any changes are made
         changes_made = False
 
+        # Check if file is template-compliant (has all template fields)
+        is_template_compliant = self._is_template_compliant(current_frontmatter, schema)
+
         # Create new frontmatter based on template schema
         new_frontmatter = {}
 
-        # Add all template fields in template order
-        for field_name, field_def in schema.fields.items():
-            if field_name in current_frontmatter:
-                # Keep existing value if it has valid content
-                existing_value = current_frontmatter[field_name]
+        # First, preserve ALL existing values
+        for field_name, value in current_frontmatter.items():
+            new_frontmatter[field_name] = value
 
-                # Safety check: preserve existing valid values
-                if self._is_valid_existing_value(existing_value, field_def):
-                    # Keep existing valid value
-                    new_frontmatter[field_name] = existing_value
-                elif field_def.required or field_def.default_value is not None:
-                    # Replace invalid value with default for required fields
-                    new_frontmatter[field_name] = self._get_safe_default_value(
+        # Add missing template fields if not template-compliant
+        if not is_template_compliant:
+            for field_name, field_def in schema.fields.items():
+                if field_name not in current_frontmatter:
+                    # Add missing template field
+                    default_value = self._get_safe_default_value(
                         field_name, field_def, current_frontmatter
                     )
+                    new_frontmatter[field_name] = default_value
                     changes_made = True
                 else:
-                    # For optional fields, keep existing value even if invalid
-                    new_frontmatter[field_name] = existing_value
+                    # Field exists - only modify if it's truly invalid
+                    existing_value = current_frontmatter[field_name]
 
-            elif field_def.required or field_def.default_value is not None:
-                # Add missing required fields or fields with defaults
-                new_frontmatter[field_name] = self._get_safe_default_value(
-                    field_name, field_def, current_frontmatter
-                )
-                changes_made = True
-
-            # Add optional fields with appropriate defaults only if they don't exist
-            elif (
-                field_name in ("image", "description", "category")
-                and field_name not in current_frontmatter
-            ):
-                if field_name == "image":
-                    new_frontmatter[field_name] = (
-                        "../../assets/images/svg/undraw/undraw_scrum_board.svg"
-                    )
-                elif field_name == "description":
-                    new_frontmatter[field_name] = ""
-                elif field_name == "category":
-                    new_frontmatter[field_name] = []
-                changes_made = True
-
-        # Preserve fields not in template (safety measure)
-        for field_name, value in current_frontmatter.items():
-            if field_name not in schema.fields:
-                new_frontmatter[field_name] = value
+                    # Only replace if value is null/None and field is required
+                    if (existing_value is None and field_def.required) or (
+                        isinstance(existing_value, str)
+                        and not existing_value.strip()
+                        and field_def.required
+                    ):
+                        default_value = self._get_safe_default_value(
+                            field_name, field_def, current_frontmatter
+                        )
+                        # Only replace if default value is not None
+                        if default_value is not None:
+                            new_frontmatter[field_name] = default_value
+                            changes_made = True
 
         # Only update if changes were made
         if changes_made:
@@ -513,6 +503,31 @@ class FrontmatterValidationUseCase:
                 setattr(file.frontmatter, field_name, value)
 
         return changes_made
+
+    def _is_template_compliant(
+        self, current_frontmatter: dict[str, Any], schema: Any
+    ) -> bool:
+        """Check if the current frontmatter is compliant with the template schema.
+
+        A file is considered template-compliant if it has all the essential template fields.
+        """
+        # Essential template fields that should be present
+        essential_fields = {
+            "title",
+            "aliases",
+            "tags",
+            "id",
+            "published",
+            "image",
+            "description",
+        }
+
+        # Check if all essential fields are present
+        for field_name in essential_fields:
+            if field_name in schema.fields and field_name not in current_frontmatter:
+                return False
+
+        return True
 
     def _is_valid_existing_value(self, value: Any, field_def: Any) -> bool:
         """Check if an existing value is valid and should be preserved.
@@ -524,19 +539,15 @@ class FrontmatterValidationUseCase:
         Returns:
             bool: True if the value is valid and should be preserved
         """
-        # Null/None values are invalid unless explicitly allowed
+        # Null/None values are only invalid for required fields
         if value is None:
-            return False
+            return not field_def.required
 
-        # Empty strings are invalid for required string fields
+        # Empty strings are only invalid for required string fields
         if isinstance(value, str) and not value.strip():
-            return field_def.field_type != FieldType.STRING or not field_def.required
+            return not field_def.required
 
-        # Empty lists are valid for array fields
-        if isinstance(value, list):
-            return field_def.field_type == FieldType.ARRAY
-
-        # Non-empty values are generally valid
+        # All other values (including empty lists, false booleans) are valid
         return True
 
     def _get_safe_default_value(
@@ -552,23 +563,35 @@ class FrontmatterValidationUseCase:
         Returns:
             Any: Safe default value for the field
         """
-        # Special handling for published field - use date if available
-        if field_name == "published" and "date" in current_frontmatter:
-            return current_frontmatter["date"]
-
         # Use field definition default if available
         if field_def.default_value is not None:
             return field_def.default_value
 
-        # Type-specific safe defaults
+        # Special handling for specific fields
+        if field_name == "published" and "date" in current_frontmatter:
+            date_value = current_frontmatter["date"]
+            # Only use date if it's not empty
+            if date_value and str(date_value).strip():
+                return date_value
+
+        # Provide appropriate defaults for template fields
         if field_def.field_type == FieldType.ARRAY:
-            return []
+            return []  # Empty array for missing array fields
         if field_def.field_type == FieldType.BOOLEAN:
             return False
         if field_def.field_type == FieldType.INTEGER:
             return 0
         if field_def.field_type == FieldType.NUMBER:
             return 0.0
+
+        # Special defaults for specific fields
+        if field_name == "image":
+            return "../../assets/images/svg/undraw/undraw_scrum_board.svg"
+        if field_name == "description":
+            return ""
+        if field_name == "category":
+            return []
+
         return ""
 
     def _generate_template_based_summary(

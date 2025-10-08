@@ -149,9 +149,11 @@ class TemplateSchemaRepository:
             field_value, field_type, template_variable
         )
 
+        # For template-based validation, don't set default values for arrays
+        # This preserves existing values in files
         # Special handling for array fields that are None in template
         if field_value is None and field_type == FieldType.ARRAY:
-            default_value = []
+            default_value = None  # Don't set default to preserve existing values
 
         # Create validation pattern if applicable
         validation_pattern = self._create_validation_pattern(field_name, field_type)
@@ -233,45 +235,51 @@ class TemplateSchemaRepository:
         self, field_name: str, field_value: Any, template_variable: str | None
     ) -> bool:
         """Determine if a field is required based on heuristics."""
-        # Core fields are typically required
-        core_fields = {
+        # Core fields that are truly required for file structure
+        core_required_fields = {
             "title",
             "id",
-            "published",
-        }  # published is required in new-fleeing-note
-        if field_name in core_fields:
+        }
+        if field_name in core_required_fields:
             return True
 
-        # Fields with template variables are usually required
-        if template_variable:
+        # Fields with template variables that generate required content
+        if template_variable and any(
+            keyword in template_variable.lower()
+            for keyword in ["creation_date", "cursor", "title"]
+        ):
+            # Special case: published field should be optional even with template variable
+            if field_name == "published":
+                return False
             return True
 
-        # Fields with empty or placeholder values are usually required
-        if isinstance(field_value, str):
-            placeholder_patterns = [
-                r"^$",  # Empty
-                r"^\s*$",  # Whitespace only
-                r"^<.*>$",  # <placeholder>
-                r"^\{.*\}$",  # {placeholder}
-                r"^TODO",  # TODO placeholder
-                r"^PLACEHOLDER",  # PLACEHOLDER
-            ]
-            for pattern in placeholder_patterns:
-                if re.match(pattern, field_value, re.IGNORECASE):
-                    return True
+        # Most other fields should be optional to preserve existing values
+        # This prevents overwriting existing valid content with template defaults
 
-        # Special handling for specific fields
-        if field_name in ("image", "description", "category"):
-            return False  # These are optional but should be included
+        # Special cases for fields that should remain optional
+        optional_fields = {
+            "published",  # Can be empty or have date
+            "image",  # Optional with default
+            "description",  # Optional, can be empty
+            "category",  # Optional, can be array or string
+            "tags",  # Optional array
+            "aliases",  # Optional array
+        }
+        if field_name in optional_fields:
+            return False
 
-        # Arrays and booleans are often optional
+        # Arrays and booleans are typically optional
         if isinstance(field_value, (list, bool)):
             return False
 
-        return False  # Default to optional
+        # Empty strings in template indicate optional fields
+        if isinstance(field_value, str) and not field_value.strip():
+            return False
+
+        return False  # Default to optional to preserve existing values
 
     def _get_default_value(
-        self, field_value: Any, field_type: FieldType, template_variable: str | None
+        self, field_value: Any, _field_type: FieldType, template_variable: str | None
     ) -> Any:
         """Get appropriate default value for the field."""
         # If template variable generates the value, no default needed
@@ -281,8 +289,17 @@ class TemplateSchemaRepository:
         ):
             return None
 
-        # Use the template value as default if it's not a placeholder
-        if isinstance(field_value, str):
+        # For template-based validation, we should NOT use template values as defaults
+        # Template values are structure definitions, not default values
+
+        # Only use template string values as defaults if they are meaningful defaults
+        # (not empty strings, placeholders, or structural values)
+        if isinstance(field_value, str) and field_value.strip():
+            # Check if it's a meaningful default (like image path)
+            if field_value.startswith(("../../assets/", "assets/")):
+                return field_value
+
+            # Don't use other string values from template as defaults
             placeholder_patterns = [
                 r"^$",
                 r"^\s*$",
@@ -295,25 +312,23 @@ class TemplateSchemaRepository:
                 re.match(pattern, field_value, re.IGNORECASE)
                 for pattern in placeholder_patterns
             )
-            if not is_placeholder:
-                return field_value
+            if is_placeholder:
+                return None
 
         # Special handling for specific template fields
         if isinstance(field_value, str) and field_value == "None":
             return None
 
-        # Use actual template values as defaults
-        if field_value is not None:
-            return field_value
+        # For arrays and other types, don't use template values as defaults
+        # Template structure should not override existing file values
+        if isinstance(field_value, list):
+            return None  # No default for arrays - preserve existing values
 
-        # Type-specific defaults
-        defaults = {
-            FieldType.ARRAY: [],
-            FieldType.BOOLEAN: False,
-            FieldType.INTEGER: 0,
-            FieldType.NUMBER: 0.0,
-        }
-        return defaults.get(field_type)
+        if isinstance(field_value, bool):
+            return None  # No default for booleans - preserve existing values
+
+        # Only return None (no default) to preserve existing values
+        return None
 
     def _create_validation_pattern(
         self, field_name: str, field_type: FieldType

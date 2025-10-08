@@ -68,7 +68,7 @@
         - Support CSV/JSON output for automation
         - _Requirements: 1.5, 1.6, 5.1, 5.4_
 
-    - [ ] 3.3.1 Add --template option to validate-frontmatter CLI command
+    - [x] 3.3.1 Add --template option to validate-frontmatter CLI command
         - Add --template option to specify template file path
         - Implement template-based validation mode vs legacy auto-detection mode
         - Add comprehensive error handling for invalid template paths
@@ -84,6 +84,7 @@
     - [ ] 3.4.1 Test template-based validation with real vault data
         - Test --template option with ~/work/myvault/900_TemplaterNotes/new-fleeing-note.md
         - Verify that valid frontmatter (like AWS Summit note) is NOT modified
+        -
         - Test type conversion with integer IDs and date objects
         - Verify that only missing fields are added, existing valid values preserved
         - Test dry-run vs execute mode behavior

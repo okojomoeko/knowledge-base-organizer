@@ -26,7 +26,8 @@ class Frontmatter(BaseModel):
     tags: list[str] = Field(default_factory=list)
     id: str | None = None
     date: str | None = None
-    publish: bool = False
+    published: str | None = None
+    publish: bool | None = None
 
     @field_validator("aliases", "tags")
     @classmethod
@@ -42,7 +43,7 @@ class Frontmatter(BaseModel):
             return None
         return str(v)
 
-    @field_validator("date", mode="before")
+    @field_validator("date", "published", mode="before")
     @classmethod
     def convert_date_to_string(cls, v: Any) -> str | None:
         """Convert date to string if it's not None."""
@@ -55,10 +56,10 @@ class Frontmatter(BaseModel):
 
     @field_validator("publish", mode="before")
     @classmethod
-    def convert_publish_to_bool(cls, v: Any) -> bool:
+    def convert_publish_to_bool(cls, v: Any) -> bool | None:
         """Convert publish to boolean, handling various input types."""
         if v is None:
-            return False
+            return None
         # Handle datetime objects (some files might have dates in publish field)
         if hasattr(v, "isoformat"):
             # If it's a date, treat as True (published)
@@ -84,6 +85,8 @@ class Frontmatter(BaseModel):
         self, template_order: list[str] | None = None, **kwargs
     ) -> OrderedDict[str, Any]:
         """Return model data as OrderedDict with specified field order."""
+        # Exclude None values by default to prevent adding unwanted fields
+        kwargs.setdefault("exclude_none", True)
         data = self.model_dump(**kwargs)
 
         if template_order:
