@@ -152,7 +152,9 @@ class TestFrontmatterValidationEndToEnd:
         request = FrontmatterValidationRequest(
             vault_path=temp_vault_copy,
             dry_run=True,
-            template_name="new-fleeing-note",  # Force fleeting note template
+            template_path=temp_vault_copy
+            / "900_TemplaterNotes"
+            / "new-fleeing-note.md",
         )
 
         result = use_case.execute(request)
@@ -188,7 +190,9 @@ class TestFrontmatterValidationEndToEnd:
         request = FrontmatterValidationRequest(
             vault_path=temp_vault_copy,
             dry_run=True,
-            template_name="booksearchtemplate",  # Force book template
+            template_path=temp_vault_copy
+            / "903_BookSearchTemplates"
+            / "booksearchtemplate.md",
         )
 
         result = use_case.execute(request)

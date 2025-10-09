@@ -229,9 +229,9 @@ publish: false
         # Fields with template variables should be required
         assert repository._is_field_required("test", "", "tp.file.cursor(1)") is True
 
-        # Empty/placeholder values should be required
-        assert repository._is_field_required("description", "", None) is True
-        assert repository._is_field_required("category", "<placeholder>", None) is True
+        # Empty/placeholder values should be optional
+        assert repository._is_field_required("description", "", None) is False
+        assert repository._is_field_required("category", "<placeholder>", None) is False
 
         # Arrays and booleans are often optional
         assert repository._is_field_required("tags", [], None) is False

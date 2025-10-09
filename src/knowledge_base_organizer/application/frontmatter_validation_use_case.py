@@ -69,12 +69,31 @@ class FrontmatterValidationUseCase:
         self, request: FrontmatterValidationRequest
     ) -> FrontmatterValidationResult:
         """Execute frontmatter validation."""
+        self._prepare_config_for_request(request)
+
         # Handle template-based validation (new behavior)
         if request.template_path:
             return self._execute_template_based_validation(request)
 
         # Handle legacy validation (existing behavior)
         return self._execute_legacy_validation(request)
+
+    def _prepare_config_for_request(self, request: FrontmatterValidationRequest) -> None:
+        """Prepare file repository config based on request."""
+        if request.include_patterns or request.exclude_patterns:
+            # Create a copy to not modify the base config for other operations
+            request_config = self.config.model_copy()
+            if request.include_patterns:
+                request_config.include_patterns = request.include_patterns
+            if request.exclude_patterns:
+                # Append to existing exclude patterns
+                request_config.exclude_patterns.extend(request.exclude_patterns)
+            self.file_repository.config = request_config
+            self.template_schema_repository.config = request_config
+        else:
+            # Ensure default config is used if no request-specific patterns
+            self.file_repository.config = self.config
+            self.template_schema_repository.config = self.config
 
     def _execute_template_based_validation(
         self, request: FrontmatterValidationRequest
