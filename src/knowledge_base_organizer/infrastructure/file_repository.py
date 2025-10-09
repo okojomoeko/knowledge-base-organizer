@@ -165,35 +165,53 @@ class FileRepository:
     def _normalize_frontmatter_fields(self, data: dict[str, Any]) -> dict[str, Any]:
         """Normalize common frontmatter field variations."""
         normalized = {}
+        key_map = {
+            "tag": "tags",
+            "tags": "tags",
+            "category": "category",
+            "categories": "category",
+            "alias": "aliases",
+            "aliases": "aliases",
+            "aka": "aliases",
+            "created": "date",
+            "created_date": "date",
+            "creation_date": "date",
+            "date": "date",
+            "public": "publish",
+            "publish": "publish",
+        }
 
         for key, value in data.items():
-            # Normalize key names
-            normalized_key = key.lower().strip()
+            original_key_lower = key.lower().strip()
+            # Get the canonical key name, or use the original key if not in map
+            normalized_key = key_map.get(original_key_lower, key)
 
-            # Handle common field name variations
-            if normalized_key in {"tag", "category", "categories"}:
-                normalized_key = "tags"
-            elif normalized_key in {"alias", "aka"}:
-                normalized_key = "aliases"
-            elif normalized_key in {"created", "created_date", "creation_date"}:
-                normalized_key = "date"
-            elif normalized_key in {"public"}:
-                normalized_key = "publish"
-            else:
-                normalized_key = key  # Keep original case for other fields
+            # Get existing value if key is being merged (e.g. tag -> tags)
+            existing_value = normalized.get(normalized_key)
 
             # Normalize values
-            if normalized_key in {"tags", "aliases"} and isinstance(value, str):
-                # Convert single string to list
-                normalized[normalized_key] = [value]
+            if normalized_key in {"tags", "aliases"}:
+                # Ensure value is a list
+                if not isinstance(value, list):
+                    value = [value] if value is not None else []
+
+                # Merge with existing values if any
+                if existing_value:
+                    if isinstance(existing_value, list):
+                        value = existing_value + value
+                    else:
+                        value = [existing_value] + value
+
+                # Remove duplicates
+                if isinstance(value, list):
+                    value = list(dict.fromkeys(item for item in value if item is not None))
+
             elif normalized_key == "publish" and isinstance(value, str):
-                # Convert string to boolean
-                normalized[normalized_key] = value.lower() in {"true", "yes", "1"}
-            elif value is None and normalized_key in {"description"}:
-                # Convert None to empty string for description field
-                normalized[normalized_key] = ""
-            else:
-                normalized[normalized_key] = value
+                value = value.lower() in {"true", "yes", "1"}
+            elif value is None and normalized_key == "description":
+                value = ""
+
+            normalized[normalized_key] = value
 
         return normalized
 
