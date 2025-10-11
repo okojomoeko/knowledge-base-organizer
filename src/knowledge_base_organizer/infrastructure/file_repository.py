@@ -179,7 +179,6 @@ class FileRepository:
             "date": "date",
             "public": "publish",
             "publish": "publish",
-            "published": "publish",
         }
 
         for key, value in data.items():

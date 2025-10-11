@@ -609,7 +609,7 @@ class FrontmatterValidationUseCase:
         if field_name == "description":
             return ""
         if field_name == "category":
-            return []
+            return ""
 
         return ""
 
