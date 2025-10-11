@@ -138,7 +138,7 @@ class TemplateSchemaRepository:
         field_type = self._determine_field_type(field_value, template_variable)
 
         # Special handling for known array fields that might be None in template
-        if field_value is None and field_name in ("category", "tags", "aliases"):
+        if field_value is None and field_name in ("tags", "aliases"):
             field_type = FieldType.ARRAY
 
         # Determine if field is required (heuristic-based)

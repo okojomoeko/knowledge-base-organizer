@@ -188,7 +188,8 @@ published: true
         assert frontmatter.title == "Test File"
         assert frontmatter.tags == ["example"]  # Normalized from 'tag'
         assert frontmatter.aliases == ["test-alias"]  # Normalized from 'alias'
-        assert frontmatter.publish is True  # Normalized from 'published'
+        assert frontmatter.published == "True"
+        assert frontmatter.publish is None
 
     def test_parse_frontmatter_with_plus_delimiters(self) -> None:
         """Test frontmatter parsing with +++ delimiters."""

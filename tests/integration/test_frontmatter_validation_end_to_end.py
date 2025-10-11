@@ -152,7 +152,9 @@ class TestFrontmatterValidationEndToEnd:
         request = FrontmatterValidationRequest(
             vault_path=temp_vault_copy,
             dry_run=True,
-            template_name="new-fleeing-note",  # Force fleeting note template
+            template_path=temp_vault_copy
+            / "900_TemplaterNotes"
+            / "new-fleeing-note.md",
         )
 
         result = use_case.execute(request)
@@ -182,36 +184,29 @@ class TestFrontmatterValidationEndToEnd:
     def test_book_notes_validation(
         self, validation_components: dict[str, Any], temp_vault_copy: Path
     ):
-        """Test validation of book notes specifically."""
+        """Test that an un-parsable template file results in a graceful error."""
         use_case = validation_components["use_case"]
+
+        # This template contains {{...}} syntax which is invalid YAML
+        unparsable_template_path = (
+            temp_vault_copy / "903_BookSearchTemplates" / "booksearchtemplate.md"
+        )
 
         request = FrontmatterValidationRequest(
             vault_path=temp_vault_copy,
             dry_run=True,
-            template_name="booksearchtemplate",  # Force book template
+            template_path=unparsable_template_path,
         )
 
         result = use_case.execute(request)
 
-        # Find book files
-        book_results = [
-            r for r in result.results if r.file_path.parent.name == "104_Books"
-        ]
-
-        assert len(book_results) > 0, "Should find book files"
-
-        for book_result in book_results:
-            # All should be validated against book template
-            if book_result.template_type:
-                assert book_result.template_type == "booksearchtemplate"
-
-            # Check for book-specific validation
-            if not book_result.is_valid:
-                # Books might be missing tags, state, isStock, etc.
-                actual_missing = set(book_result.missing_fields)
-
-                # Should detect some book-specific issues
-                assert len(actual_missing) >= 0, "Should detect missing fields"
+        # The use case should not process any files and return an error summary
+        assert result.total_files == 0
+        assert len(result.results) == 0
+        assert "error" in result.summary
+        assert "Template error" in result.summary["error"]
+        # Check for a message indicating a YAML parsing problem
+        assert "Failed to parse template" in result.summary["error"]
 
     def test_fix_suggestions_accuracy_and_safety(
         self, validation_components: dict[str, Any], temp_vault_copy: Path
