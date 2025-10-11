@@ -204,7 +204,9 @@ class FileRepository:
 
                 # Remove duplicates
                 if isinstance(value, list):
-                    value = list(dict.fromkeys(item for item in value if item is not None))
+                    value = list(
+                        dict.fromkeys(item for item in value if item is not None)
+                    )
 
             elif normalized_key == "publish" and isinstance(value, str):
                 value = value.lower() in {"true", "yes", "1"}

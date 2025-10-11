@@ -78,7 +78,9 @@ class FrontmatterValidationUseCase:
         # Handle legacy validation (existing behavior)
         return self._execute_legacy_validation(request)
 
-    def _prepare_config_for_request(self, request: FrontmatterValidationRequest) -> None:
+    def _prepare_config_for_request(
+        self, request: FrontmatterValidationRequest
+    ) -> None:
         """Prepare file repository config based on request."""
         if request.include_patterns or request.exclude_patterns:
             # Create a copy to not modify the base config for other operations
