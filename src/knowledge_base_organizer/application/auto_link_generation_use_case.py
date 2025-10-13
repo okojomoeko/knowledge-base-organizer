@@ -153,8 +153,11 @@ class AutoLinkGenerationUseCase:
                     self.link_analysis_service.exclude_tables = True
 
                 # Find link candidates
-                candidates = self.content_processing_service.find_link_candidates(
-                    file.content, file_registry, exclusion_zones
+                candidates = self.link_analysis_service.find_link_candidates(
+                    file.content,
+                    file_registry,
+                    exclusion_zones,
+                    current_file_id=file.extract_file_id(),
                 )
 
                 if not candidates:
@@ -320,17 +323,19 @@ class AutoLinkGenerationUseCase:
         """Apply file updates to the actual files."""
         for update in file_updates:
             try:
-                if update.update_type == "add_wikilink":
-                    # Update file content with new WikiLinks
-                    if update.new_content:
-                        self.file_repository.save_file_content(
-                            update.file_path, update.new_content
-                        )
+                # Load the full MarkdownFile object to ensure we have all its parts
+                markdown_file = self.file_repository.load_file(update.file_path)
+
+                if update.update_type == "add_wikilink" and update.new_content:
+                    # Update the content of the MarkdownFile object
+                    markdown_file.content = update.new_content
+                    # Save the entire file, which preserves frontmatter
+                    self.file_repository.save_file(markdown_file, backup=True)
 
                 elif update.update_type == "add_alias" and update.frontmatter_changes:
                     # Update frontmatter with new aliases
                     self.file_repository.update_frontmatter(
-                        update.file_path, update.frontmatter_changes
+                        update.file_path, update.frontmatter_changes, backup=True
                     )
 
             except Exception as e:

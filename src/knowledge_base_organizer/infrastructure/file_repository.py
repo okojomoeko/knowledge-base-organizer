@@ -325,7 +325,7 @@ class FileRepository:
                     formatted_items = []
                     for item in value:
                         if self._needs_quoting(str(item), field_name):
-                            formatted_items.append(f'"{item}"')
+                            formatted_items.append(f"'{item}'")
                         else:
                             formatted_items.append(str(item))
                     lines.append(f"{field_name}: [{','.join(formatted_items)}]")
@@ -339,7 +339,7 @@ class FileRepository:
                     lines.append(f"{field_name}:")
                 # Don't quote simple strings unless they contain special characters
                 elif self._needs_quoting(value, field_name):
-                    lines.append(f'{field_name}: "{value}"')
+                    lines.append(f"{field_name}: '{value}'")
                 else:
                     lines.append(f"{field_name}: {value}")
             else:
@@ -357,7 +357,7 @@ class FileRepository:
                             formatted_items = []
                             for item in value:
                                 if self._needs_quoting(str(item), field_name):
-                                    formatted_items.append(f'"{item}"')
+                                    formatted_items.append(f"'{item}'")
                                 else:
                                     formatted_items.append(str(item))
                             lines.append(f"{field_name}: [{','.join(formatted_items)}]")
@@ -370,7 +370,7 @@ class FileRepository:
                         if value == "":
                             lines.append(f"{field_name}:")
                         elif self._needs_quoting(value, field_name):
-                            lines.append(f'{field_name}: "{value}"')
+                            lines.append(f"{field_name}: '{value}'")
                         else:
                             lines.append(f"{field_name}: {value}")
                     else:
@@ -381,13 +381,13 @@ class FileRepository:
     def _needs_quoting(self, value: str, field_name: str = "") -> bool:
         """Determine if a string value needs quoting in YAML."""
         # Special handling for fields that should always be quoted
-        always_quote_fields = {"image"}
+        always_quote_fields = {"image", "id"}
         if field_name in always_quote_fields:
             return True
 
         # Special handling for specific fields that should not be quoted
         # even if they look like numbers
-        numeric_fields_no_quote = {"id"}
+        numeric_fields_no_quote = set()
         if field_name in numeric_fields_no_quote:
             # Only quote if contains special characters, not for numeric values
             special_chars = [

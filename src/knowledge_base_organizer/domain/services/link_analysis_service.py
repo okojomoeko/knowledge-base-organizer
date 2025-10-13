@@ -90,6 +90,8 @@ class LinkAnalysisService:
         - Regular markdown links ([...](...))
         - Link Reference Definitions ([id|alias]: path "title")
         - Tables (if configured)
+        - H1 headers (# ...)
+        - HTML tags (<a>...</a>)
 
         Args:
             content: The markdown content to analyze
@@ -128,6 +130,31 @@ class LinkAnalysisService:
             # Skip processing if we're in frontmatter
             if in_frontmatter:
                 continue
+
+            # Detect H1 headers: # ...
+            if line.strip().startswith("# "):
+                exclusion_zones.append(
+                    TextRange(
+                        start_line=line_num,
+                        start_column=0,
+                        end_line=line_num,
+                        end_column=len(line),
+                        zone_type="h1_header",
+                    )
+                )
+
+            # Detect HTML 'a' tags: <a...>...</a>
+            html_a_tag_pattern = re.compile(r"<a[^>]*>.*?</a>")
+            for match in html_a_tag_pattern.finditer(line):
+                exclusion_zones.append(
+                    TextRange(
+                        start_line=line_num,
+                        start_column=match.start(),
+                        end_line=line_num,
+                        end_column=match.end(),
+                        zone_type="html_tag",
+                    )
+                )
 
             # Detect WikiLinks: [[...]]
             wiki_pattern = re.compile(r"\[\[([^\]]+)\]\]")
@@ -210,6 +237,7 @@ class LinkAnalysisService:
         content: str,
         file_registry: dict[str, MarkdownFile],
         exclusion_zones: list[TextRange] | None = None,
+        current_file_id: str | None = None,
     ) -> list[LinkCandidate]:
         """Find text that could be converted to WikiLinks.
 
@@ -217,6 +245,7 @@ class LinkAnalysisService:
             content: The markdown content to analyze
             file_registry: Dictionary mapping file IDs to MarkdownFile objects
             exclusion_zones: Areas to exclude from link detection
+            current_file_id: The ID of the file being processed, to avoid self-linking
 
         Returns:
             List of LinkCandidate objects
@@ -246,6 +275,10 @@ class LinkAnalysisService:
         for line_num, line in enumerate(lines, 1):
             # Find potential matches for each target
             for target_text, file_id in all_targets.items():
+                # Avoid self-linking
+                if current_file_id and file_id == current_file_id:
+                    continue
+
                 # Use word boundaries to find exact matches
                 pattern = re.compile(
                     r"\b" + re.escape(target_text) + r"\b", re.IGNORECASE
@@ -420,13 +453,6 @@ class LinkAnalysisService:
         self, matched_text: str, target_file: MarkdownFile
     ) -> str | None:
         """Determine the best alias to use for a WikiLink."""
-        # If the matched text is the same as the title, no alias needed
-        if (
-            target_file.frontmatter.title
-            and matched_text.lower() == target_file.frontmatter.title.lower()
-        ):
-            return None
-
         # If the matched text is in the aliases, use it as alias
         for alias in target_file.frontmatter.aliases:
             if matched_text.lower() == alias.lower():
