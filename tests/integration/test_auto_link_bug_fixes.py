@@ -115,18 +115,28 @@ def test_auto_link_bug_fixes(auto_link_use_case, bug_test_vault_path):
         # 1. Verify Frontmatter is preserved
         assert modified_content.startswith("---"), "Frontmatter block was deleted."
         assert "title: Source Note" in modified_content, "Frontmatter content was lost."
-        assert "id: '20251012100000'" in modified_content, "Frontmatter content was lost."
+        assert "id: 20251012100000" in modified_content, (
+            "Frontmatter content was lost."
+        )
 
         # 2. Verify H1 header is not linked
-        assert "# Source Note" in modified_content, "H1 header was incorrectly modified."
-        assert "# [[20251012100000|Source Note]]" not in modified_content, "H1 header was incorrectly linked."
+        assert "# Source Note" in modified_content, (
+            "H1 header was incorrectly modified."
+        )
+        assert "# [[20251012100000|Source Note]]" not in modified_content, (
+            "H1 header was incorrectly linked."
+        )
 
         # 3. Verify HTML link is preserved
-        assert '<a href="https://example.com">Example Link</a>' in modified_content, "HTML link was broken."
+        assert '<a href="https://example.com">Example Link</a>' in modified_content, (
+            "HTML link was broken."
+        )
 
         # 4. Verify the intended link was created
-        expected_link = "[[20251012100100|Target Note]]"
-        assert f"This note talks about a {expected_link}." in modified_content, "The correct link was not created."
+        expected_link = "[[20251012100100]]"  # No alias needed for exact title match
+        assert f"This note talks about a {expected_link}." in modified_content, (
+            "The correct link was not created."
+        )
 
         # 5. Verify original content is different
         assert original_content != modified_content

@@ -10,6 +10,7 @@ This test suite verifies:
 """
 
 import json
+import re
 import subprocess
 import time
 from pathlib import Path
@@ -70,8 +71,6 @@ class TestDeadLinkDetectionRealData:
         json_output = "\n".join(lines[json_start:])
 
         # Clean control characters and parse JSON
-        import re
-
         clean_json = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", json_output)
         data = json.loads(clean_json)
         data["execution_time"] = execution_time

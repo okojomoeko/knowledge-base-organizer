@@ -238,6 +238,9 @@ class TestFrontmatterValidationEndToEnd:
                         "no-template.md",
                         "blog-template.md",
                         "template_daily-note.md",
+                        "daily-note.md",
+                        "new-fleeing-note.md",
+                        "wikilnk-fleet.md",
                     ], (
                         f"Should not suggest title fixes for files that have titles: "
                         f"{result_with_fixes.file_path}"

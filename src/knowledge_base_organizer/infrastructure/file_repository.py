@@ -140,6 +140,10 @@ class FileRepository:
             frontmatter_text = match.group(2)
             body_content = content[match.end() :]
 
+            # Remove template syntax before parsing YAML
+            frontmatter_text = re.sub(r"<%.*?%>", "", frontmatter_text)
+            frontmatter_text = re.sub(r"{{.*?}}", "", frontmatter_text)
+
             try:
                 frontmatter_data = yaml.safe_load(frontmatter_text) or {}
 
@@ -183,37 +187,32 @@ class FileRepository:
 
         for key, value in data.items():
             original_key_lower = key.lower().strip()
-            # Get the canonical key name, or use the original key if not in map
             normalized_key = key_map.get(original_key_lower, key)
-
-            # Get existing value if key is being merged (e.g. tag -> tags)
             existing_value = normalized.get(normalized_key)
 
-            # Normalize values
-            if normalized_key in {"tags", "aliases"}:
-                # Ensure value is a list
-                if not isinstance(value, list):
-                    value = [value] if value is not None else []
+            processed_value = value
 
-                # Merge with existing values if any
+            if normalized_key in {"tags", "aliases"}:
+                if not isinstance(processed_value, list):
+                    processed_value = [processed_value] if processed_value is not None else []
+
                 if existing_value:
                     if isinstance(existing_value, list):
-                        value = existing_value + value
+                        processed_value = existing_value + processed_value
                     else:
-                        value = [existing_value] + value
+                        processed_value = [existing_value, *processed_value]
 
-                # Remove duplicates
-                if isinstance(value, list):
-                    value = list(
-                        dict.fromkeys(item for item in value if item is not None)
+                if isinstance(processed_value, list):
+                    processed_value = list(
+                        dict.fromkeys(item for item in processed_value if item is not None)
                     )
 
-            elif normalized_key == "publish" and isinstance(value, str):
-                value = value.lower() in {"true", "yes", "1"}
-            elif value is None and normalized_key == "description":
-                value = ""
+            elif normalized_key == "publish" and isinstance(processed_value, str):
+                processed_value = processed_value.lower() in {"true", "yes", "1"}
+            elif processed_value is None and normalized_key == "description":
+                processed_value = ""
 
-            normalized[normalized_key] = value
+            normalized[normalized_key] = processed_value
 
         return normalized
 
@@ -381,13 +380,13 @@ class FileRepository:
     def _needs_quoting(self, value: str, field_name: str = "") -> bool:
         """Determine if a string value needs quoting in YAML."""
         # Special handling for fields that should always be quoted
-        always_quote_fields = {"image", "id"}
+        always_quote_fields = {"image"}
         if field_name in always_quote_fields:
             return True
 
         # Special handling for specific fields that should not be quoted
         # even if they look like numbers
-        numeric_fields_no_quote = set()
+        numeric_fields_no_quote = {"id"}
         if field_name in numeric_fields_no_quote:
             # Only quote if contains special characters, not for numeric values
             special_chars = [

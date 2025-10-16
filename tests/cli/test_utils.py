@@ -1,11 +1,14 @@
 """CLI テスト用のユーティリティ関数"""
 
+import contextlib
+import glob
 import json
 import re
+from pathlib import Path
 
 
 def extract_json_from_cli_output(stdout: str) -> dict:
-    """CLI出力からJSONを抽出してパースする（制御文字対応版）
+    """CLI出力からJSONを抽出してパースする(制御文字対応版)
 
     Args:
         stdout: CLI コマンドの標準出力
@@ -41,7 +44,7 @@ def extract_json_from_cli_output(stdout: str) -> dict:
     # JSON文字列を結合
     json_text = "\n".join(json_lines).strip()
 
-    # 制御文字を除去（改行、タブ、復帰文字以外）
+    # 制御文字を除去(改行、タブ、復帰文字以外)
     clean_json = "".join(
         char for char in json_text if ord(char) >= 32 or char in ["\n", "\r", "\t"]
     )
@@ -57,8 +60,6 @@ def save_test_output(content: str, filename: str) -> None:
         content: 保存する内容
         filename: ファイル名
     """
-    from pathlib import Path
-
     # tests/test_output_results ディレクトリを作成
     output_dir = Path(__file__).parent.parent / "test_output_results"
     output_dir.mkdir(exist_ok=True)
@@ -73,11 +74,8 @@ def cleanup_test_files(pattern: str = "test_*.json") -> None:
     """テスト実行で生成されたファイルをクリーンアップする
 
     Args:
-        pattern: 削除するファイルのパターン（安全のため、test_* で始まるファイルのみ）
+        pattern: 削除するファイルのパターン(安全のため、test_* で始まるファイルのみ)
     """
-    import glob
-    from pathlib import Path
-
     # 安全のため、特定のテスト出力ファイルのみを削除
     safe_patterns = [
         "test_*.json",
@@ -94,8 +92,6 @@ def cleanup_test_files(pattern: str = "test_*.json") -> None:
 
     # プロジェクトルートの不要なファイルを削除
     project_root = Path(__file__).parent.parent.parent
-    for file_path in glob.glob(str(project_root / pattern)):
-        try:
-            Path(file_path).unlink()
-        except FileNotFoundError:
-            pass
+    for file_path in project_root.glob(pattern):
+        with contextlib.suppress(FileNotFoundError):
+            file_path.unlink()

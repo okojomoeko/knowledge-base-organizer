@@ -364,3 +364,75 @@ This is the body.
         assert service._is_table_row("|---|---|")
         assert not service._is_table_row("Regular text")
         assert not service._is_table_row("| Not closed")
+
+    def test_find_link_candidates_excludes_existing_wikilinks(
+        self, service, file_registry
+    ):
+        """Test that existing WikiLinks are excluded."""
+        content = """# My Document
+
+This discusses [[20230101120000|Interface Design]] and how it works.
+We also need to consider UI Design for the project.
+"""
+
+        candidates = service.find_link_candidates(content, file_registry)
+
+        # Should only find "UI Design", not "Interface Design" in the WikiLink
+        assert len(candidates) == 1
+        assert candidates[0].text == "UI Design"
+
+    def test_find_link_candidates_excludes_regular_links(self, service, file_registry):
+        """Test that regular markdown links are excluded."""
+        content = """# My Document
+
+Check out this [Interface Design](https://example.com) resource.
+We also need to work on UI Design.
+"""
+
+        candidates = service.find_link_candidates(content, file_registry)
+
+        # Should only find "UI Design", not "Interface Design" in the regular link
+        assert len(candidates) == 1
+        assert candidates[0].text == "UI Design"
+
+    def test_find_link_candidates_excludes_template_variables(
+        self, service, file_registry
+    ):
+        """Test that template variables are excluded."""
+        content = """# My Document
+
+Template: {{Interface Design}} and <% UI Design %>
+But we do need to discuss Interface Design in general.
+"""
+
+        candidates = service.find_link_candidates(content, file_registry)
+
+        # Should only find the one outside template variables
+        assert len(candidates) == 1
+        assert candidates[0].position.line_number == 4
+
+    def test_word_boundary_matching(self, service, file_registry):
+        """Test that word boundaries are respected in matching."""
+        content = """# My Document
+
+The word "design" appears in Interface Design but not in "designed".
+"""
+
+        candidates = service.find_link_candidates(content, file_registry)
+
+        # Should find "Interface Design" but not "design" or "designed"
+        assert len(candidates) == 1
+        assert candidates[0].text == "Interface Design"
+
+    def test_case_insensitive_matching(self, service, file_registry):
+        """Test case-insensitive matching."""
+        content = """# My Document
+
+We need better interface design and INTERFACE DESIGN.
+"""
+
+        candidates = service.find_link_candidates(content, file_registry)
+
+        # Should find both matches despite different cases
+        assert len(candidates) == 2
+        assert all(c.target_file_id == "20230101120000" for c in candidates)

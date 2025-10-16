@@ -112,6 +112,21 @@ class TextPosition(BaseModel):
     column_end: int
 
 
+class TextRange(BaseModel):
+    """Represents a range of text that should be excluded from link processing."""
+
+    model_config = ConfigDict(
+        validate_assignment=True,
+        extra="forbid",
+    )
+
+    start_line: int
+    start_column: int
+    end_line: int
+    end_column: int
+    zone_type: str  # "frontmatter", "wikilink", "regular_link", "link_ref_def", "table", "template_variable"  # noqa: E501
+
+
 class WikiLink(BaseModel):
     """WikiLink representation."""
 
@@ -302,10 +317,8 @@ class MarkdownFile(BaseModel):
 
         return True  # Unknown type, assume valid
 
-    def _get_template_exclusion_zones(self) -> list[Any]:
+    def _get_template_exclusion_zones(self) -> list["TextRange"]:
         """Get exclusion zones for template variables and template blocks."""
-        from .services.link_analysis_service import TextRange
-
         exclusion_zones = []
         lines = self.content.split("\n")
 
@@ -334,7 +347,7 @@ class MarkdownFile(BaseModel):
         return exclusion_zones
 
     def _is_in_exclusion_zone(
-        self, position: "TextPosition", exclusion_zones: list[Any]
+        self, position: "TextPosition", exclusion_zones: list["TextRange"]
     ) -> bool:
         """Check if a position falls within any exclusion zone."""
         for zone in exclusion_zones:

@@ -1,11 +1,11 @@
-"""Content processing service for safe text replacement and link generation."""
+"Content processing service for safe text replacement and link generation."
 
 import re
 
 from pydantic import BaseModel, ConfigDict
 
-from ..models import MarkdownFile, TextPosition
-from .link_analysis_service import LinkCandidate, TextRange
+from ..models import MarkdownFile, TextPosition, TextRange
+from .link_analysis_service import LinkCandidate
 
 
 class LinkReplacement(BaseModel):
@@ -61,61 +61,6 @@ class ContentProcessingService:
             max_links_per_file: Maximum number of links to create per file
         """
         self.max_links_per_file = max_links_per_file
-
-    def find_link_candidates(
-        self,
-        content: str,
-        file_registry: dict[str, MarkdownFile],
-        exclusion_zones: list[TextRange] | None = None,
-    ) -> list[LinkCandidate]:
-        """Find text that could be converted to WikiLinks using exact matches.
-
-        Args:
-            content: The markdown content to analyze
-            file_registry: Dictionary mapping file IDs to MarkdownFile objects
-            exclusion_zones: Areas to exclude from link detection
-
-        Returns:
-            List of LinkCandidate objects sorted by position
-        """
-        if exclusion_zones is None:
-            exclusion_zones = self._extract_exclusion_zones(content)
-
-        candidates = []
-        lines = content.split("\n")
-
-        # Build lookup tables for exact matches
-        title_to_file = {}
-        alias_to_file = {}
-
-        for file_id, file in file_registry.items():
-            # Map title to file ID (exact match, case-insensitive)
-            if file.frontmatter.title:
-                title_key = file.frontmatter.title.strip().lower()
-                if title_key:
-                    title_to_file[title_key] = file_id
-
-            # Map aliases to file ID (exact match, case-insensitive)
-            for alias in file.frontmatter.aliases:
-                alias_key = alias.strip().lower()
-                if alias_key:
-                    alias_to_file[alias_key] = file_id
-
-        # Combine all possible link targets
-        all_targets = {**title_to_file, **alias_to_file}
-
-        # Find candidates for each target
-        for target_text, file_id in all_targets.items():
-            candidates.extend(
-                self._find_text_matches(
-                    target_text, file_id, lines, exclusion_zones, file_registry
-                )
-            )
-
-        # Sort candidates by line number and column position
-        candidates.sort(key=lambda c: (c.position.line_number, c.position.column_start))
-
-        return candidates
 
     def resolve_conflicts(
         self, candidates: list[LinkCandidate]
@@ -220,101 +165,6 @@ class ContentProcessingService:
             skipped_candidates=skipped_candidates,
         )
 
-    def _extract_exclusion_zones(self, content: str) -> list[TextRange]:
-        """Extract areas where auto-linking should be avoided."""
-        exclusion_zones = []
-        lines = content.split("\n")
-
-        # Track frontmatter boundaries
-        frontmatter_start = None
-        in_frontmatter = False
-
-        for line_num, line in enumerate(lines, 1):
-            # Detect frontmatter boundaries
-            if line.strip() == "---":
-                if frontmatter_start is None:
-                    frontmatter_start = line_num
-                    in_frontmatter = True
-                elif in_frontmatter:
-                    in_frontmatter = False
-                    # Add frontmatter exclusion zone
-                    exclusion_zones.append(
-                        TextRange(
-                            start_line=frontmatter_start,
-                            start_column=0,
-                            end_line=line_num,
-                            end_column=len(line),
-                            zone_type="frontmatter",
-                        )
-                    )
-
-            # Skip processing if we're in frontmatter
-            if in_frontmatter:
-                continue
-
-            # Detect existing WikiLinks: [[...]]
-            wiki_pattern = re.compile(r"\[\[([^\]]+)\]\]")
-            for match in wiki_pattern.finditer(line):
-                exclusion_zones.append(
-                    TextRange(
-                        start_line=line_num,
-                        start_column=match.start(),
-                        end_line=line_num,
-                        end_column=match.end(),
-                        zone_type="wikilink",
-                    )
-                )
-
-            # Detect regular markdown links: [text](url)
-            regular_link_pattern = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
-            for match in regular_link_pattern.finditer(line):
-                exclusion_zones.append(
-                    TextRange(
-                        start_line=line_num,
-                        start_column=match.start(),
-                        end_line=line_num,
-                        end_column=match.end(),
-                        zone_type="regular_link",
-                    )
-                )
-
-            # Detect Link Reference Definitions: [id|alias]: path "title"
-            link_ref_pattern = re.compile(
-                r"^\[([^|\]]+)\|([^\]]+)\]:\s*([^\s]+)(?:\s+\"([^\"]+)\")?"
-            )
-            if link_ref_pattern.match(line.strip()):
-                exclusion_zones.append(
-                    TextRange(
-                        start_line=line_num,
-                        start_column=0,
-                        end_line=line_num,
-                        end_column=len(line),
-                        zone_type="link_ref_def",
-                    )
-                )
-
-            # Detect template variables: ${...}, {{...}}, <% ... %>
-            template_patterns = [
-                re.compile(r"\$\{[^}]*\}"),  # ${variable}
-                re.compile(r"\{\{[^}]*\}\}"),  # {{variable}}
-                re.compile(r"<%[^%]*%>"),  # <% template %>
-                re.compile(r"<%\*[^*]*\*%>"),  # <%* template *%>
-            ]
-
-            for pattern in template_patterns:
-                for match in pattern.finditer(line):
-                    exclusion_zones.append(
-                        TextRange(
-                            start_line=line_num,
-                            start_column=match.start(),
-                            end_line=line_num,
-                            end_column=match.end(),
-                            zone_type="template_variable",
-                        )
-                    )
-
-        return exclusion_zones
-
     def _find_text_matches(
         self,
         target_text: str,
@@ -357,7 +207,9 @@ class ContentProcessingService:
         return candidates
 
     def _is_in_exclusion_zone(
-        self, position: TextPosition, exclusion_zones: list[TextRange]
+        self,
+        position: TextPosition,
+        exclusion_zones: list[TextRange],
     ) -> bool:
         """Check if a position falls within any exclusion zone."""
         for zone in exclusion_zones:
@@ -383,7 +235,9 @@ class ContentProcessingService:
         return False
 
     def _determine_best_alias(
-        self, matched_text: str, target_file: MarkdownFile
+        self,
+        matched_text: str,
+        target_file: MarkdownFile,
     ) -> str | None:
         """Determine the best alias to use for a WikiLink."""
         # If the matched text is the same as the title, no alias needed
@@ -402,7 +256,9 @@ class ContentProcessingService:
         return matched_text
 
     def _get_text_range(
-        self, position: TextPosition, text_length: int
+        self,
+        position: TextPosition,
+        text_length: int,
     ) -> tuple[int, int, int]:
         """Get a text range tuple for overlap checking."""
         return (
@@ -412,7 +268,9 @@ class ContentProcessingService:
         )
 
     def _ranges_overlap(
-        self, range1: tuple[int, int, int], range2: tuple[int, int, int]
+        self,
+        range1: tuple[int, int, int],
+        range2: tuple[int, int, int],
     ) -> bool:
         """Check if two text ranges overlap."""
         line1, start1, end1 = range1
@@ -426,7 +284,8 @@ class ContentProcessingService:
         return not (end1 <= start2 or end2 <= start1)
 
     def _resolve_single_conflict(
-        self, overlapping_candidates: list[LinkCandidate]
+        self,
+        overlapping_candidates: list[LinkCandidate],
     ) -> ConflictResolution:
         """Resolve a single conflict between overlapping candidates."""
         # Priority rules for conflict resolution:
@@ -471,7 +330,9 @@ class ContentProcessingService:
         return score
 
     def _filter_valid_candidates(
-        self, candidates: list[LinkCandidate], conflicts: list[ConflictResolution]
+        self,
+        candidates: list[LinkCandidate],
+        conflicts: list[ConflictResolution],
     ) -> list[LinkCandidate]:
         """Filter candidates based on conflict resolution."""
         # Get all candidates that were involved in conflicts
@@ -503,7 +364,9 @@ class ContentProcessingService:
         return f"[[{candidate.target_file_id}]]"
 
     def _apply_replacements_to_content(
-        self, content: str, replacements: list[LinkReplacement]
+        self,
+        content: str,
+        replacements: list[LinkReplacement],
     ) -> str:
         """Apply text replacements to content."""
         lines = content.split("\n")

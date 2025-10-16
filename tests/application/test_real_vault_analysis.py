@@ -137,10 +137,9 @@ class TestRealVaultAnalysis:
             else:  # Has unparseable frontmatter (templater syntax)
                 unparseable_templates.append(file)
 
-        # Should have both parseable and unparseable templates (good test data variety)
-        assert len(parseable_templates) > 0, "Should have some parseable template files"
-        assert len(unparseable_templates) > 0, (
-            "Should have some unparseable template files (with templater syntax)"
+        # With the improved parsing, we expect no unparseable templates
+        assert len(unparseable_templates) == 0, (
+            "Should have no unparseable template files, as parsing is now more robust"
         )
 
     def test_error_handling_with_malformed_files(

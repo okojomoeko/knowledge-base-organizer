@@ -4,22 +4,7 @@ import re
 
 from pydantic import BaseModel, ConfigDict
 
-from ..models import MarkdownFile, TextPosition
-
-
-class TextRange(BaseModel):
-    """Represents a range of text that should be excluded from link processing."""
-
-    model_config = ConfigDict(
-        validate_assignment=True,
-        extra="forbid",
-    )
-
-    start_line: int
-    start_column: int
-    end_line: int
-    end_column: int
-    zone_type: str  # "frontmatter", "wikilink", "regular_link", "link_ref_def", "table", "template_variable"  # noqa: E501
+from ..models import MarkdownFile, TextPosition, TextRange
 
 
 class LinkCandidate(BaseModel):
@@ -92,6 +77,8 @@ class LinkAnalysisService:
         - Tables (if configured)
         - H1 headers (# ...)
         - HTML tags (<a>...</a>)
+        - Code blocks (```...``` and `...`)
+        - URLs (http://... or https://...)
 
         Args:
             content: The markdown content to analyze
@@ -102,26 +89,63 @@ class LinkAnalysisService:
         exclusion_zones = []
         lines = content.split("\n")
 
-        # Track frontmatter boundaries
+        # Pre-compile regex patterns for efficiency
+        html_a_tag_pattern = re.compile(r"<a[^>]*>.*?</a>")
+        inline_code_pattern = re.compile(r"`.*?`")
+        wiki_pattern = re.compile(r"\[\[([^\]]+)\]\]")
+        regular_link_pattern = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+        link_ref_pattern = re.compile(
+            r"^\[([^|\]]+)\|([^\]]+)\]:\s*([^\s]+)(?:\s+\"([^\"]+)\")?"
+        )
+        url_pattern = re.compile(r"https?://[^\s)]+")
+        template_patterns = [
+            re.compile(r"\$\{[^}]*\}"),  # ${variable}
+            re.compile(r"\{\{[^}]*\}\}"),  # {{variable}}
+            re.compile(r"<%[^%]*%>"),  # <% template %>
+            re.compile(r"<%\*[^*]*\*%>"),  # <%* template *%>
+        ]
+
+        # Track frontmatter and code block boundaries
         frontmatter_start = None
-        frontmatter_end = None
         in_frontmatter = False
+        in_code_block = False
+        code_block_start_line = 0
 
         for line_num, line in enumerate(lines, 1):
+            # Detect fenced code blocks
+            if line.strip().startswith("```"):
+                if not in_code_block:
+                    in_code_block = True
+                    code_block_start_line = line_num
+                else:
+                    in_code_block = False
+                    exclusion_zones.append(
+                        TextRange(
+                            start_line=code_block_start_line,
+                            start_column=0,
+                            end_line=line_num,
+                            end_column=len(line),
+                            zone_type="code_block",
+                        )
+                    )
+                continue
+
+            if in_code_block:
+                continue
+
             # Detect frontmatter boundaries
             if line.strip() == "---":
                 if frontmatter_start is None:
                     frontmatter_start = line_num
                     in_frontmatter = True
                 elif in_frontmatter:
-                    frontmatter_end = line_num
                     in_frontmatter = False
                     # Add frontmatter exclusion zone
                     exclusion_zones.append(
                         TextRange(
                             start_line=frontmatter_start,
                             start_column=0,
-                            end_line=frontmatter_end,
+                            end_line=line_num,
                             end_column=len(line),
                             zone_type="frontmatter",
                         )
@@ -143,8 +167,19 @@ class LinkAnalysisService:
                     )
                 )
 
+            # Detect URLs
+            for match in url_pattern.finditer(line):
+                exclusion_zones.append(
+                    TextRange(
+                        start_line=line_num,
+                        start_column=match.start(),
+                        end_line=line_num,
+                        end_column=match.end(),
+                        zone_type="url",
+                    )
+                )
+
             # Detect HTML 'a' tags: <a...>...</a>
-            html_a_tag_pattern = re.compile(r"<a[^>]*>.*?</a>")
             for match in html_a_tag_pattern.finditer(line):
                 exclusion_zones.append(
                     TextRange(
@@ -156,8 +191,19 @@ class LinkAnalysisService:
                     )
                 )
 
+            # Detect inline code blocks: `...`
+            for match in inline_code_pattern.finditer(line):
+                exclusion_zones.append(
+                    TextRange(
+                        start_line=line_num,
+                        start_column=match.start(),
+                        end_line=line_num,
+                        end_column=match.end(),
+                        zone_type="inline_code",
+                    )
+                )
+
             # Detect WikiLinks: [[...]]
-            wiki_pattern = re.compile(r"\[\[([^\]]+)\]\]")
             for match in wiki_pattern.finditer(line):
                 exclusion_zones.append(
                     TextRange(
@@ -170,7 +216,6 @@ class LinkAnalysisService:
                 )
 
             # Detect regular markdown links: [text](url)
-            regular_link_pattern = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
             for match in regular_link_pattern.finditer(line):
                 exclusion_zones.append(
                     TextRange(
@@ -183,9 +228,6 @@ class LinkAnalysisService:
                 )
 
             # Detect Link Reference Definitions: [id|alias]: path "title"
-            link_ref_pattern = re.compile(
-                r"^\[([^|\]]+)\|([^\]]+)\]:\s*([^\s]+)(?:\s+\"([^\"]+)\")?"
-            )
             if link_ref_pattern.match(line.strip()):
                 exclusion_zones.append(
                     TextRange(
@@ -210,14 +252,6 @@ class LinkAnalysisService:
                 )
 
             # Detect template variables and template blocks
-            # Template variables: ${...}, {{...}}, <% ... %>
-            template_patterns = [
-                re.compile(r"\$\{[^}]*\}"),  # ${variable}
-                re.compile(r"\{\{[^}]*\}\}"),  # {{variable}}
-                re.compile(r"<%[^%]*%>"),  # <% template %>
-                re.compile(r"<%\*[^*]*\*%>"),  # <%* template *%>
-            ]
-
             for pattern in template_patterns:
                 for match in pattern.finditer(line):
                     exclusion_zones.append(
@@ -453,6 +487,13 @@ class LinkAnalysisService:
         self, matched_text: str, target_file: MarkdownFile
     ) -> str | None:
         """Determine the best alias to use for a WikiLink."""
+        # If the matched text is the same as the title, no alias needed
+        if (
+            target_file.frontmatter.title
+            and matched_text.lower() == target_file.frontmatter.title.lower()
+        ):
+            return None
+
         # If the matched text is in the aliases, use it as alias
         for alias in target_file.frontmatter.aliases:
             if matched_text.lower() == alias.lower():

@@ -11,6 +11,7 @@ from rich.tree import Tree
 from ..domain.services.frontmatter_enhancement_service import (
     FrontmatterEnhancementService,
 )
+from ..infrastructure.config import ProcessingConfig
 from ..infrastructure.file_repository import FileRepository
 
 app = typer.Typer(name="tag-management", help="Tag pattern management commands")
@@ -188,7 +189,7 @@ def analyze_vault_tags(
     console.print(f"🔍 Analyzing vault: {vault_path}")
 
     # Load files
-    from ..infrastructure.config import ProcessingConfig
+
 
     config = ProcessingConfig()
     file_repo = FileRepository(config)
@@ -259,7 +260,7 @@ def suggest_tags_for_file(
         raise typer.Exit(1)
 
     # Load file
-    from ..infrastructure.config import ProcessingConfig
+
 
     config = ProcessingConfig()
     file_repo = FileRepository(config)
@@ -344,7 +345,6 @@ def show_related_tags(
 
     # If vault path provided, update analysis first
     if vault_path:
-        from ..infrastructure.config import ProcessingConfig
 
         config = ProcessingConfig()
         file_repo = FileRepository(config)

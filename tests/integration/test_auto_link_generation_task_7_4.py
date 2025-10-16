@@ -356,6 +356,10 @@ class TestAutoLinkGenerationTask74:
     def test_performance_with_larger_scope(self, auto_link_use_case, temp_vault_path):
         """Test performance characteristics with larger scope."""
 
+        # Add a file with known linkable content to ensure candidates are found
+        linkable_content_path = temp_vault_path / "linkable_content.md"
+        linkable_content_path.write_text("This is a test file about Amazon CloudWatch.")
+
         # Test with larger scope to measure performance
         request = AutoLinkGenerationRequest(
             vault_path=temp_vault_path,
@@ -371,7 +375,7 @@ class TestAutoLinkGenerationTask74:
         # Verify reasonable performance (should complete within reasonable time)
         assert execution_time < 30.0, f"Execution took too long: {execution_time:.2f}s"
 
-        # Verify all files were processed
+        # Verify at least the new file was processed
         assert result.total_files_processed > 0
 
         print(
