@@ -321,6 +321,35 @@
         - Create troubleshooting guide
         - _Requirements: 5.6, 6.6_
 
+## Phase 12: Semantic Auto-Linking
+
+- [ ] 13. Implement Semantic Analysis Service
+    - [ ] 13.1 Set up embedding model infrastructure
+        - Choose and integrate a sentence-transformer model.
+        - Implement `SemanticAnalysisService` to generate and cache vector embeddings for notes and sections.
+        - _Requirements: FR-13_
+    - [ ] 13.2 Implement Context-Aware Candidate Validation
+        - In `LinkAnalysisService`, use `SemanticAnalysisService` to calculate cosine similarity between source context and target note.
+        - Filter candidates based on a configurable confidence threshold.
+        - _Requirements: FR-13_
+
+- [ ] 14. Implement Advanced Linking Features
+    - [ ] 14.1 Implement Link Disambiguation
+        - In `AutoLinkGenerationUseCase`, handle candidates with multiple potential targets.
+        - Implement ranking based on semantic score.
+        - Add interactive prompt for user to select the correct link when scores are close.
+        - _Requirements: FR-14_
+    - [ ] 14.2 Implement Section-Level Linking
+        - Enhance `SemanticAnalysisService` to generate embeddings for note sections (headers).
+        - In `LinkAnalysisService`, compare source context with target sections.
+        - Generate header links (`[[ID#Section]]`) when a section is a strong match.
+        - _Requirements: FR-16_
+    - [ ] 14.3 Implement Proactive Alias Suggestion
+        - Create a new `AliasSuggestionUseCase`.
+        - Implement logic to analyze the entire vault for terms frequently used in semantically similar contexts to a note.
+        - Add a new CLI command `suggest-aliases` to present suggestions to the user.
+        - _Requirements: FR-15_
+
 ## Benefits of This Approach
 
 ### ✅ User Value First - Knowledge Base Organization Focus

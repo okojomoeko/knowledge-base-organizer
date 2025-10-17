@@ -176,3 +176,47 @@ The application prioritizes frontmatter standardization, intelligent WikiLink ge
 5. WHEN generating reports THEN the system SHALL provide trend analysis and quality dashboards
 6. WHEN maintenance is complete THEN the system SHALL log all actions taken and provide audit trails
 7. WHEN issues are resolved THEN the system SHALL verify fixes and update quality metrics accordingly
+
+## Advanced Auto-Linking Requirements (Semantic Linking)
+
+### Requirement 13: Context-Aware Linking
+
+**User Story:** As an Obsidian user, I want the system to only create links when the text's context matches the target note's meaning, so that links are always relevant and I avoid incorrect connections (e.g., linking "apple" the fruit to "Apple Inc.").
+
+#### Acceptance Criteria
+
+1.  WHEN scanning for link candidates, THEN the system SHALL analyze the surrounding text of the candidate (e.g., the paragraph).
+2.  WHEN a candidate is found, THEN the system SHALL calculate the semantic similarity between the source context and the content of the target note.
+3.  WHEN a similarity score is calculated, THEN the system SHALL only create a link if the score exceeds a configurable confidence threshold (e.g., 0.7).
+4.  WHEN a link is created based on semantic similarity, THEN the system's report SHALL indicate the confidence score.
+
+### Requirement 14: Link Disambiguation
+
+**User Story:** As an Obsidian user, when a term like "API" could refer to multiple notes (e.g., "REST API", "AWS API Gateway"), I want the system to intelligently choose the best one or ask me for clarification, so that links are always accurate.
+
+#### Acceptance Criteria
+
+1.  WHEN a link candidate could match multiple target notes, THEN the system SHALL use semantic context similarity to rank the potential targets.
+2.  WHEN running in automatic mode, THEN the system SHALL link to the target with the highest similarity score, provided it is above the confidence threshold.
+3.  WHEN running in an interactive mode, THEN the system SHALL prompt the user to choose from the top-ranked targets if their similarity scores are close.
+4.  WHEN no single target has a sufficiently high confidence score, THEN no link SHALL be created.
+
+### Requirement 15: Proactive Alias Suggestion
+
+**User Story:** As an Obsidian user, I want the system to discover and suggest new aliases for my notes, so that my knowledge base's connectivity improves over time as my vocabulary evolves.
+
+#### Acceptance Criteria
+
+1.  WHEN analyzing the vault, THEN the system SHALL identify terms that are not existing aliases but frequently appear in contexts semantically similar to a target note.
+2.  WHEN a potential new alias is identified (e.g., "ML" for "Machine Learning"), THEN the system SHALL suggest adding the new term to the target note's `aliases` frontmatter field.
+3.  WHEN running in an interactive mode, THEN the user SHALL be prompted to accept or reject the alias suggestion.
+
+### Requirement 16: Section-Level Linking
+
+**User Story:** As an Obsidian user, I want auto-links to point to the specific section of a note being discussed, not just the top of the file, so I can navigate directly to the most relevant information.
+
+#### Acceptance Criteria
+
+1.  WHEN analyzing a link candidate, THEN the system SHALL compare the source context's semantic similarity against each section (delimited by headers) of the target note.
+2.  WHEN the similarity to a specific section is significantly higher than to the note as a whole, THEN the system SHALL generate a header link (e.g., `[[NOTE_ID#Section Title]]`).
+3.  WHEN generating a header link, THEN the system SHALL ensure the header text is correctly formatted for URL fragments.

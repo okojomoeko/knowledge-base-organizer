@@ -30,7 +30,10 @@ graph TB
         S1[LinkAnalysisService]
         S2[ContentProcessingService]
         S3[ValidationService]
+        S4[SemanticAnalysisService]
     end
+
+    S1 --> S4
 
     subgraph "Infrastructure Layer"
         FR[FileRepository]
@@ -196,15 +199,18 @@ class AutoLinkGenerationUseCase:
         self,
         file_repository: FileRepository,
         link_analysis_service: LinkAnalysisService,
-        content_processing_service: ContentProcessingService
+        content_processing_service: ContentProcessingService,
+        semantic_analysis_service: SemanticAnalysisService
     ):
         # Dependencies injection
 
     def execute(self, request: AutoLinkRequest) -> AutoLinkResult:
         # Build file registry (id -> file mapping)
-        # For each file, find potential link candidates
+        # For each file, find potential link candidates using LinkAnalysisService
+        # Use SemanticAnalysisService to score candidates based on context
+        # Handle disambiguation for ambiguous links
         # Exclude existing links, frontmatter, tables (if configured)
-        # Generate WikiLinks with appropriate aliases
+        # Generate WikiLinks with appropriate aliases based on confidence scores
         # Apply changes if not dry-run
         # Return link generation report
 ```
@@ -215,13 +221,13 @@ class AutoLinkGenerationUseCase:
 
 ```python
 class LinkAnalysisService:
-    def find_link_candidates(
+    def find_advanced_link_candidates(
         self,
         content: str,
         file_registry: Dict[str, MarkdownFile],
         exclusion_zones: List[TextRange]
-    ) -> List[LinkCandidate]:
-        """Find text that could be converted to WikiLinks"""
+    ) -> List[AdvancedLinkCandidate]:
+        """Find text that could be converted to WikiLinks, enriched with semantic context and confidence scores."""
 
     def detect_dead_links(
         self,
@@ -232,6 +238,17 @@ class LinkAnalysisService:
 
     def calculate_link_density(self, file: MarkdownFile) -> LinkDensityMetrics:
         """Calculate various link metrics for a file"""
+```
+
+**Semantic Analysis Service:**
+
+```python
+class SemanticAnalysisService:
+    def calculate_similarity(self, text1: str, text2: str) -> float:
+        """Calculate semantic similarity between two texts using vector embeddings."""
+
+    def get_embedding(self, text: str) -> List[float]:
+        """Generate a vector embedding for a given text."""
 ```
 
 **Content Processing Service:**
@@ -291,6 +308,25 @@ class ProcessingConfig:
     @classmethod
     def from_file(cls, config_path: Path) -> 'ProcessingConfig':
         """Load configuration from YAML file"""
+```
+
+## Data Models for Semantic Linking
+
+```python
+@dataclass
+class PotentialTarget:
+    file_id: str
+    title: str
+    context_similarity: float
+
+@dataclass
+class AdvancedLinkCandidate:
+    text: str
+    position: TextPosition
+    potential_targets: List[PotentialTarget]
+    best_target: Optional[PotentialTarget]
+    confidence_score: float
+    requires_disambiguation: bool
 ```
 
 ## Data Models
