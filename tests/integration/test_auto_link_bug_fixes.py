@@ -115,9 +115,7 @@ def test_auto_link_bug_fixes(auto_link_use_case, bug_test_vault_path):
         # 1. Verify Frontmatter is preserved
         assert modified_content.startswith("---"), "Frontmatter block was deleted."
         assert "title: Source Note" in modified_content, "Frontmatter content was lost."
-        assert "id: 20251012100000" in modified_content, (
-            "Frontmatter content was lost."
-        )
+        assert "id: 20251012100000" in modified_content, "Frontmatter content was lost."
 
         # 2. Verify H1 header is not linked
         assert "# Source Note" in modified_content, (

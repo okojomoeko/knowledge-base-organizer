@@ -1,6 +1,7 @@
 """Tag pattern management system for intelligent tag suggestions."""
 
 import json
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -101,7 +102,8 @@ class TagPatternManager:
 
         except Exception as e:
             print(
-                f"Warning: Failed to load Japanese variations from {user_variations_file}: {e}"
+                f"Warning: Failed to load Japanese variations from "
+                f"{user_variations_file}: {e}"
             )
             # Fallback to minimal hardcoded patterns
             return self._get_fallback_patterns()
@@ -114,8 +116,6 @@ class TagPatternManager:
         )
 
         if default_file.exists():
-            import shutil
-
             shutil.copy2(default_file, target_path)
             print(f"Created default Japanese variations file at: {target_path}")
         else:
@@ -572,8 +572,6 @@ class TagPatternManager:
         try:
             user_variations_file = self.config_dir / "japanese_variations.yaml"
             if user_variations_file.exists():
-                import shutil
-
                 shutil.copy2(user_variations_file, export_path)
                 return True
             return False
@@ -597,8 +595,6 @@ class TagPatternManager:
 
             # Copy to user config
             user_variations_file = self.config_dir / "japanese_variations.yaml"
-            import shutil
-
             shutil.copy2(import_path, user_variations_file)
 
             # Reload patterns

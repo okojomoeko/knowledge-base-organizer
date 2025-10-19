@@ -369,22 +369,18 @@ class AutoLinkGenerationUseCase:
         )
 
         # Files with links added
-        files_with_links = len(
-            {
-                update.file_path
-                for update in file_updates
-                if update.update_type == "add_wikilink"
-            }
-        )
+        files_with_links = len({
+            update.file_path
+            for update in file_updates
+            if update.update_type == "add_wikilink"
+        })
 
         # Files with aliases added
-        files_with_aliases = len(
-            {
-                update.file_path
-                for update in file_updates
-                if update.update_type == "add_alias"
-            }
-        )
+        files_with_aliases = len({
+            update.file_path
+            for update in file_updates
+            if update.update_type == "add_alias"
+        })
 
         return {
             "files_processed": len(files_processed),

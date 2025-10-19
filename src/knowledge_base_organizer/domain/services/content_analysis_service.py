@@ -26,6 +26,36 @@ class ImprovementSuggestion(BaseModel):
     reason: str
 
 
+class DuplicateMatch(BaseModel):
+    """Represents a potential duplicate file match."""
+
+    model_config = ConfigDict(
+        validate_assignment=True,
+        extra="forbid",
+    )
+
+    file_path: Path
+    similarity_score: float  # 0.0 to 1.0
+    match_type: str  # "title", "content", "filename", "combined"
+    match_details: str
+    confidence: float  # 0.0 to 1.0
+
+
+class DuplicateDetectionResult(BaseModel):
+    """Result of duplicate detection for a single file."""
+
+    model_config = ConfigDict(
+        validate_assignment=True,
+        extra="forbid",
+    )
+
+    file_path: Path
+    potential_duplicates: list[DuplicateMatch]
+    is_likely_duplicate: bool
+    merge_suggestions: list[str]
+    analysis_notes: list[str]
+
+
 class ContentAnalysisResult(BaseModel):
     """Result of content analysis for a single file."""
 
@@ -548,3 +578,296 @@ class ContentAnalysisService:
                 results.append(error_result)
 
         return results
+
+    def detect_duplicates(
+        self, files: list[MarkdownFile], similarity_threshold: float = 0.7
+    ) -> list[DuplicateDetectionResult]:
+        """Detect potential duplicate files based on various similarity metrics."""
+        results = []
+
+        for i, file in enumerate(files):
+            potential_duplicates = []
+
+            # Compare with all other files
+            for j, other_file in enumerate(files):
+                if i >= j:  # Skip self and already compared pairs
+                    continue
+
+                duplicate_match = self._compare_files_for_duplicates(
+                    file, other_file, similarity_threshold
+                )
+
+                if duplicate_match:
+                    potential_duplicates.append(duplicate_match)
+
+            # Create result for this file
+            is_likely_duplicate = any(
+                match.confidence > 0.8 for match in potential_duplicates
+            )
+
+            merge_suggestions = self._generate_merge_suggestions(
+                file, potential_duplicates
+            )
+
+            analysis_notes = []
+            if potential_duplicates:
+                analysis_notes.append(
+                    f"Found {len(potential_duplicates)} potential duplicate(s)"
+                )
+            else:
+                analysis_notes.append("No duplicates detected")
+
+            result = DuplicateDetectionResult(
+                file_path=file.path,
+                potential_duplicates=potential_duplicates,
+                is_likely_duplicate=is_likely_duplicate,
+                merge_suggestions=merge_suggestions,
+                analysis_notes=analysis_notes,
+            )
+            results.append(result)
+
+        return results
+
+    def _compare_files_for_duplicates(
+        self, file1: MarkdownFile, file2: MarkdownFile, threshold: float
+    ) -> DuplicateMatch | None:
+        """Compare files and return duplicate match if similarity is above threshold."""
+        # Calculate different types of similarity
+        title_similarity = self._calculate_title_similarity(file1, file2)
+        content_similarity = self._calculate_content_similarity(file1, file2)
+        filename_similarity = self._calculate_filename_similarity(file1, file2)
+
+        # Determine the strongest match type and overall similarity
+        similarities = {
+            "title": title_similarity,
+            "content": content_similarity,
+            "filename": filename_similarity,
+        }
+
+        max_similarity = max(similarities.values())
+        match_type = max(similarities, key=similarities.get)
+
+        # Calculate combined similarity with weights
+        combined_similarity = (
+            title_similarity * 0.4
+            + content_similarity * 0.4
+            + filename_similarity * 0.2
+        )
+
+        # Use the higher of max individual similarity or combined similarity
+        final_similarity = max(max_similarity, combined_similarity)
+
+        if final_similarity >= threshold:
+            # Generate match details
+            match_details = self._generate_match_details(file1, file2, similarities)
+
+            # Calculate confidence based on multiple factors
+            confidence = self._calculate_duplicate_confidence(
+                similarities, file1, file2
+            )
+
+            return DuplicateMatch(
+                file_path=file2.path,
+                similarity_score=final_similarity,
+                match_type=match_type
+                if max_similarity == final_similarity
+                else "combined",
+                match_details=match_details,
+                confidence=confidence,
+            )
+
+        return None
+
+    def _calculate_title_similarity(
+        self, file1: MarkdownFile, file2: MarkdownFile
+    ) -> float:
+        """Calculate similarity between file titles."""
+        title1 = getattr(file1.frontmatter, "title", "") or ""
+        title2 = getattr(file2.frontmatter, "title", "") or ""
+
+        if not title1 or not title2:
+            return 0.0
+
+        # Normalize titles for comparison
+        norm_title1 = self._normalize_for_comparison(title1)
+        norm_title2 = self._normalize_for_comparison(title2)
+
+        return self._calculate_similarity(norm_title1, norm_title2)
+
+    def _calculate_content_similarity(
+        self, file1: MarkdownFile, file2: MarkdownFile
+    ) -> float:
+        """Calculate similarity between file contents."""
+        # Extract main content (excluding frontmatter)
+        content1 = self._extract_main_content(file1.content)
+        content2 = self._extract_main_content(file2.content)
+
+        if not content1 or not content2:
+            return 0.0
+
+        # For very short content, use exact matching
+        if len(content1) < 100 and len(content2) < 100:
+            return 1.0 if content1.strip() == content2.strip() else 0.0
+
+        # Use word-based similarity for longer content
+        return self._calculate_text_similarity(content1, content2)
+
+    def _calculate_filename_similarity(
+        self, file1: MarkdownFile, file2: MarkdownFile
+    ) -> float:
+        """Calculate similarity between filenames."""
+        name1 = file1.path.stem
+        name2 = file2.path.stem
+
+        # Skip timestamp-based filenames
+        if re.match(r"^\d{14}$", name1) or re.match(r"^\d{14}$", name2):
+            return 0.0
+
+        norm_name1 = self._normalize_for_comparison(name1)
+        norm_name2 = self._normalize_for_comparison(name2)
+
+        return self._calculate_similarity(norm_name1, norm_name2)
+
+    def _extract_main_content(self, full_content: str) -> str:
+        """Extract main content excluding frontmatter and headers."""
+        lines = full_content.split("\n")
+        content_lines = []
+
+        for line in lines:
+            stripped = line.strip()
+            # Skip empty lines and headers
+            if not stripped or stripped.startswith("#"):
+                continue
+            content_lines.append(stripped)
+
+        return " ".join(content_lines)
+
+    def _calculate_text_similarity(self, text1: str, text2: str) -> float:
+        """Calculate similarity between two text strings using word overlap."""
+        if not text1 or not text2:
+            return 0.0
+
+        # Normalize and tokenize
+        words1 = set(self._normalize_for_comparison(text1).split())
+        words2 = set(self._normalize_for_comparison(text2).split())
+
+        if not words1 or not words2:
+            return 0.0
+
+        # Calculate Jaccard similarity
+        intersection = words1.intersection(words2)
+        union = words1.union(words2)
+
+        jaccard_similarity = len(intersection) / len(union) if union else 0.0
+
+        # Also calculate overlap coefficient (useful for different length texts)
+        min_size = min(len(words1), len(words2))
+        overlap_coefficient = len(intersection) / min_size if min_size > 0 else 0.0
+
+        # Return the higher of the two measures
+        return max(jaccard_similarity, overlap_coefficient)
+
+    def _generate_match_details(
+        self, file1: MarkdownFile, file2: MarkdownFile, similarities: dict[str, float]
+    ) -> str:
+        """Generate detailed description of why files are considered duplicates."""
+        details = []
+
+        if similarities["title"] > 0.7:
+            title1 = getattr(file1.frontmatter, "title", "")
+            title2 = getattr(file2.frontmatter, "title", "")
+            details.append(f"Similar titles: '{title1}' vs '{title2}'")
+
+        if similarities["filename"] > 0.7:
+            details.append(
+                f"Similar filenames: '{file1.path.stem}' vs '{file2.path.stem}'"
+            )
+
+        if similarities["content"] > 0.7:
+            content_len1 = len(file1.content.strip())
+            content_len2 = len(file2.content.strip())
+            details.append(f"Similar content ({content_len1} vs {content_len2} chars)")
+
+        return "; ".join(details) if details else "Multiple similarity factors"
+
+    def _calculate_duplicate_confidence(
+        self, similarities: dict[str, float], file1: MarkdownFile, file2: MarkdownFile
+    ) -> float:
+        """Calculate confidence that files are duplicates."""
+        base_confidence = max(similarities.values())
+
+        # Boost confidence if multiple similarity types are high
+        high_similarities = sum(1 for sim in similarities.values() if sim > 0.7)
+        if high_similarities >= 2:
+            base_confidence = min(1.0, base_confidence + 0.1)
+
+        # Boost confidence for very short files with high content similarity
+        if similarities["content"] > 0.9:
+            content1_len = len(file1.content.strip())
+            content2_len = len(file2.content.strip())
+            if content1_len < 200 and content2_len < 200:
+                base_confidence = min(1.0, base_confidence + 0.1)
+
+        # Reduce confidence if files are in different directories
+        # (might be intentional organization)
+        if file1.path.parent != file2.path.parent:
+            base_confidence = max(0.0, base_confidence - 0.1)
+
+        return base_confidence
+
+    def _generate_merge_suggestions(
+        self, file: MarkdownFile, duplicates: list[DuplicateMatch]
+    ) -> list[str]:
+        """Generate suggestions for merging duplicate files."""
+        if not duplicates:
+            return []
+
+        suggestions = []
+
+        # Find the highest confidence duplicate
+        best_match = max(duplicates, key=lambda x: x.confidence)
+
+        if best_match.confidence > 0.8:
+            suggestions.append(
+                f"Consider merging with {best_match.file_path.name} "
+                f"(confidence: {best_match.confidence:.2f})"
+            )
+
+            # Suggest which file to keep based on various factors
+            suggestions.extend(self._suggest_merge_strategy(file, best_match))
+
+        if len(duplicates) > 1:
+            suggestions.append(
+                f"Multiple potential duplicates found - "
+                f"review all {len(duplicates)} matches"
+            )
+
+        return suggestions
+
+    def _suggest_merge_strategy(
+        self, _file: MarkdownFile, duplicate_match: DuplicateMatch
+    ) -> list[str]:
+        """Suggest strategy for merging duplicate files."""
+        suggestions = []
+
+        # Note: We don't have access to the other file's content here
+        # In a real implementation, we'd need to load it for comparison
+
+        suggestions.append(
+            "Keep the file with more complete content and better frontmatter"
+        )
+
+        if duplicate_match.match_type == "title":
+            suggestions.append(
+                "Files have similar titles - check if content is truly duplicate"
+            )
+        elif duplicate_match.match_type == "content":
+            suggestions.append(
+                "Files have similar content - merge unique information from both"
+            )
+        elif duplicate_match.match_type == "filename":
+            suggestions.append(
+                "Files have similar names - verify if they serve different purposes"
+            )
+
+        return suggestions

@@ -9,6 +9,8 @@ from knowledge_base_organizer.domain.models import Frontmatter, MarkdownFile
 from knowledge_base_organizer.domain.services.content_analysis_service import (
     ContentAnalysisResult,
     ContentAnalysisService,
+    DuplicateDetectionResult,
+    DuplicateMatch,
     ImprovementSuggestion,
 )
 
@@ -366,3 +368,290 @@ This is the second paragraph that should not be included.
         assert result.quality_score == 0.0
         assert result.issues_found == 1
         assert "Analysis failed" in result.analysis_notes[0]
+
+    def test_detect_duplicates_identical_titles(self, service):
+        """Test duplicate detection for files with identical titles."""
+        # Create two files with identical titles
+        frontmatter1 = Frontmatter(title="Identical Title", tags=["test"])
+        frontmatter2 = Frontmatter(title="Identical Title", tags=["sample"])
+
+        mock_path1 = Mock(spec=Path)
+        mock_path1.stem = "file1"
+        mock_path1.parent = Path("/test")
+
+        mock_path2 = Mock(spec=Path)
+        mock_path2.stem = "file2"
+        mock_path2.parent = Path("/test")
+
+        file1 = MarkdownFile(
+            path=mock_path1,
+            frontmatter=frontmatter1,
+            content="Different content for file 1",
+        )
+
+        file2 = MarkdownFile(
+            path=mock_path2,
+            frontmatter=frontmatter2,
+            content="Different content for file 2",
+        )
+
+        results = service.detect_duplicates([file1, file2])
+
+        assert len(results) == 2
+
+        # First file should have file2 as potential duplicate
+        result1 = results[0]
+        assert isinstance(result1, DuplicateDetectionResult)
+        assert len(result1.potential_duplicates) == 1
+
+        duplicate_match = result1.potential_duplicates[0]
+        assert isinstance(duplicate_match, DuplicateMatch)
+        assert duplicate_match.file_path == mock_path2
+        assert duplicate_match.match_type in ["title", "combined"]
+        assert duplicate_match.similarity_score > 0.7
+
+    def test_detect_duplicates_similar_content(self, service):
+        """Test duplicate detection for files with similar content."""
+        frontmatter1 = Frontmatter(title="File One", tags=["test"])
+        frontmatter2 = Frontmatter(title="File Two", tags=["sample"])
+
+        mock_path1 = Mock(spec=Path)
+        mock_path1.stem = "file1"
+        mock_path1.parent = Path("/test")
+
+        mock_path2 = Mock(spec=Path)
+        mock_path2.stem = "file2"
+        mock_path2.parent = Path("/test")
+
+        # Create files with very similar content
+        similar_content = (
+            "This is a detailed explanation of the concept. "
+            "It covers multiple aspects and provides examples. "
+            "The information is comprehensive and well-structured."
+        )
+
+        file1 = MarkdownFile(
+            path=mock_path1,
+            frontmatter=frontmatter1,
+            content=similar_content,
+        )
+
+        file2 = MarkdownFile(
+            path=mock_path2,
+            frontmatter=frontmatter2,
+            content=similar_content + " Additional sentence.",
+        )
+
+        results = service.detect_duplicates([file1, file2])
+
+        assert len(results) == 2
+
+        # Should detect high content similarity
+        result1 = results[0]
+        assert len(result1.potential_duplicates) == 1
+
+        duplicate_match = result1.potential_duplicates[0]
+        assert duplicate_match.match_type in ["content", "combined"]
+        assert duplicate_match.similarity_score > 0.8
+
+    def test_detect_duplicates_similar_filenames(self, service):
+        """Test duplicate detection for files with similar filenames."""
+        frontmatter1 = Frontmatter(title="Different Title One", tags=["test"])
+        frontmatter2 = Frontmatter(title="Different Title Two", tags=["sample"])
+
+        mock_path1 = Mock(spec=Path)
+        mock_path1.stem = "test-file-name"
+        mock_path1.parent = Path("/test")
+
+        mock_path2 = Mock(spec=Path)
+        mock_path2.stem = "test-file-name-copy"
+        mock_path2.parent = Path("/test")
+
+        file1 = MarkdownFile(
+            path=mock_path1,
+            frontmatter=frontmatter1,
+            content="Content for first file",
+        )
+
+        file2 = MarkdownFile(
+            path=mock_path2,
+            frontmatter=frontmatter2,
+            content="Content for second file",
+        )
+
+        results = service.detect_duplicates([file1, file2])
+
+        # Should detect filename similarity
+        result1 = results[0]
+        if result1.potential_duplicates:
+            duplicate_match = result1.potential_duplicates[0]
+            assert duplicate_match.match_type in ["filename", "combined"]
+
+    def test_detect_duplicates_no_matches(self, service):
+        """Test duplicate detection when files are completely different."""
+        frontmatter1 = Frontmatter(title="Unique Title One", tags=["test"])
+        frontmatter2 = Frontmatter(title="Unique Title Two", tags=["sample"])
+
+        mock_path1 = Mock(spec=Path)
+        mock_path1.stem = "unique-file-one"
+        mock_path1.parent = Path("/test")
+
+        mock_path2 = Mock(spec=Path)
+        mock_path2.stem = "unique-file-two"
+        mock_path2.parent = Path("/test")
+
+        file1 = MarkdownFile(
+            path=mock_path1,
+            frontmatter=frontmatter1,
+            content="Completely unique content about programming",
+        )
+
+        file2 = MarkdownFile(
+            path=mock_path2,
+            frontmatter=frontmatter2,
+            content="Totally different content about cooking recipes",
+        )
+
+        results = service.detect_duplicates([file1, file2])
+
+        assert len(results) == 2
+
+        # Should not detect any duplicates
+        for result in results:
+            assert len(result.potential_duplicates) == 0
+            assert not result.is_likely_duplicate
+            assert "No duplicates detected" in result.analysis_notes
+
+    def test_detect_duplicates_timestamp_filenames_ignored(self, service):
+        """Test that timestamp-based filenames are handled correctly."""
+        frontmatter1 = Frontmatter(title="Test Title", tags=["test"])
+        frontmatter2 = Frontmatter(title="Test Title", tags=["test"])
+
+        mock_path1 = Mock(spec=Path)
+        mock_path1.stem = "20241116105142"  # Timestamp filename
+        mock_path1.parent = Path("/test")
+
+        mock_path2 = Mock(spec=Path)
+        mock_path2.stem = "20241116105143"  # Another timestamp filename
+        mock_path2.parent = Path("/test")
+
+        file1 = MarkdownFile(
+            path=mock_path1,
+            frontmatter=frontmatter1,
+            content="Same content",
+        )
+
+        file2 = MarkdownFile(
+            path=mock_path2,
+            frontmatter=frontmatter2,
+            content="Same content",
+        )
+
+        results = service.detect_duplicates([file1, file2])
+
+        # Should still detect duplicates based on title and content,
+        # but filename similarity should be 0
+        result1 = results[0]
+        if result1.potential_duplicates:
+            duplicate_match = result1.potential_duplicates[0]
+            # Should match on title or content, not filename
+            assert duplicate_match.match_type in ["title", "content", "combined"]
+
+    def test_calculate_title_similarity(self, service):
+        """Test title similarity calculation."""
+        frontmatter1 = Frontmatter(title="Test File Name")
+        frontmatter2 = Frontmatter(title="Test File Name")
+
+        mock_path = Mock(spec=Path)
+
+        file1 = MarkdownFile(path=mock_path, frontmatter=frontmatter1, content="")
+        file2 = MarkdownFile(path=mock_path, frontmatter=frontmatter2, content="")
+
+        similarity = service._calculate_title_similarity(file1, file2)
+        assert similarity == 1.0
+
+        # Test with different titles
+        frontmatter2.title = "Different Title"
+        file2 = MarkdownFile(path=mock_path, frontmatter=frontmatter2, content="")
+
+        similarity = service._calculate_title_similarity(file1, file2)
+        assert similarity == 0.0
+
+    def test_calculate_content_similarity(self, service):
+        """Test content similarity calculation."""
+        mock_path = Mock(spec=Path)
+        frontmatter = Frontmatter(title="Test")
+
+        content1 = "This is a test content with multiple words and concepts"
+        content2 = "This is a test content with multiple words and concepts"
+
+        file1 = MarkdownFile(path=mock_path, frontmatter=frontmatter, content=content1)
+        file2 = MarkdownFile(path=mock_path, frontmatter=frontmatter, content=content2)
+
+        similarity = service._calculate_content_similarity(file1, file2)
+        assert similarity == 1.0
+
+        # Test with different content
+        content2 = "Completely different content about other topics"
+        file2 = MarkdownFile(path=mock_path, frontmatter=frontmatter, content=content2)
+
+        similarity = service._calculate_content_similarity(file1, file2)
+        assert similarity < 0.3  # Should be low similarity
+
+    def test_extract_main_content(self, service):
+        """Test main content extraction."""
+        full_content = """---
+title: Test
+---
+
+# Main Title
+
+This is the first paragraph of content.
+
+## Subsection
+
+This is more content that should be included.
+
+# Another Section
+
+Final paragraph of content.
+"""
+
+        main_content = service._extract_main_content(full_content)
+
+        # Should exclude headers but include paragraph content
+        assert "This is the first paragraph" in main_content
+        assert "This is more content" in main_content
+        assert "Final paragraph" in main_content
+        assert "# Main Title" not in main_content
+        assert "## Subsection" not in main_content
+
+    def test_generate_merge_suggestions(self, service):
+        """Test merge suggestion generation."""
+        mock_path1 = Mock(spec=Path)
+        mock_path1.name = "file1.md"
+
+        mock_path2 = Mock(spec=Path)
+        mock_path2.name = "file2.md"
+
+        file = MarkdownFile(
+            path=mock_path1,
+            frontmatter=Frontmatter(title="Test"),
+            content="Test content",
+        )
+
+        # Create high-confidence duplicate match
+        duplicate_match = DuplicateMatch(
+            file_path=mock_path2,
+            similarity_score=0.9,
+            match_type="title",
+            match_details="Similar titles",
+            confidence=0.85,
+        )
+
+        suggestions = service._generate_merge_suggestions(file, [duplicate_match])
+
+        assert len(suggestions) > 0
+        assert "Consider merging" in suggestions[0]
+        assert "file2.md" in suggestions[0]
+        assert "0.85" in suggestions[0]

@@ -190,7 +190,6 @@ def analyze_vault_tags(
 
     # Load files
 
-
     config = ProcessingConfig()
     file_repo = FileRepository(config)
     files = file_repo.load_vault(vault_path)
@@ -260,7 +259,6 @@ def suggest_tags_for_file(
         raise typer.Exit(1)
 
     # Load file
-
 
     config = ProcessingConfig()
     file_repo = FileRepository(config)
@@ -345,7 +343,6 @@ def show_related_tags(
 
     # If vault path provided, update analysis first
     if vault_path:
-
         config = ProcessingConfig()
         file_repo = FileRepository(config)
         files = file_repo.load_vault(vault_path)

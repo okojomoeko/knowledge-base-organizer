@@ -10,6 +10,7 @@ import typer
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
+from ..domain.services.content_analysis_service import ContentAnalysisService
 from ..domain.services.frontmatter_enhancement_service import (
     FrontmatterEnhancementService,
 )
@@ -30,6 +31,8 @@ def organize_command(
     max_improvements: int = 50,
     verbose: bool = False,
     create_backup: bool = True,
+    detect_duplicates: bool = False,
+    duplicate_threshold: float = 0.7,
 ) -> None:
     """Automatically organize and improve knowledge base quality."""
     try:
@@ -52,7 +55,14 @@ def organize_command(
         # Load files and analyze
         results = _analyze_vault_improvements(vault_path, config)
 
-        if not results:
+        # Detect duplicates if requested
+        duplicate_results = []
+        if detect_duplicates:
+            duplicate_results = _analyze_vault_duplicates(
+                vault_path, config, duplicate_threshold
+            )
+
+        if not results and not duplicate_results:
             console.print("✅ No improvements needed - your vault is well organized!")
             return
 
@@ -63,13 +73,15 @@ def organize_command(
                 result.improvements_made = len(result.changes_applied)
 
         # Display summary
-        _display_summary(results)
+        _display_summary(results, duplicate_results)
 
         # Display results based on format
         if output_format == "console":
             _display_console_results(results, verbose)
+            if duplicate_results:
+                _display_duplicate_results(duplicate_results, verbose)
         elif output_format == "json":
-            _output_json_results(results, output_file)
+            _output_json_results(results, output_file, duplicate_results)
 
         # Apply changes if not dry-run
         if not dry_run:
@@ -140,13 +152,53 @@ def _analyze_vault_improvements(
     return [r for r in results if r.success and r.improvements_made > 0]
 
 
-def _display_summary(results: list[Any]) -> None:
+def _analyze_vault_duplicates(
+    vault_path: Path, config: ProcessingConfig, threshold: float = 0.7
+) -> list[Any]:
+    """Analyze vault for duplicate files."""
+    file_repo = FileRepository(config)
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Loading files for duplicate detection...", total=None)
+        files = file_repo.load_vault(vault_path)
+        progress.update(task, description=f"Loaded {len(files)} files")
+
+        if not files:
+            return []
+
+        # Initialize content analysis service
+        progress.update(task, description="Detecting duplicates...")
+        analysis_service = ContentAnalysisService()
+
+        # Detect duplicates
+        duplicate_results = analysis_service.detect_duplicates(files, threshold)
+
+        progress.update(task, description="Duplicate detection complete!")
+
+    # Filter to only results with potential duplicates
+    return [r for r in duplicate_results if r.potential_duplicates]
+
+
+def _display_summary(
+    results: list[Any], duplicate_results: list[Any] | None = None
+) -> None:
     """Display summary of improvements found."""
     total_improvements = sum(r.improvements_made for r in results)
 
     console.print("\n📊 Organization Analysis Complete")
     console.print(f"Files with improvements: {len(results)}")
     console.print(f"Total improvements found: {total_improvements}")
+
+    if duplicate_results:
+        total_duplicates = sum(len(r.potential_duplicates) for r in duplicate_results)
+        likely_duplicates = sum(1 for r in duplicate_results if r.is_likely_duplicate)
+        console.print(f"Files with potential duplicates: {len(duplicate_results)}")
+        console.print(f"Total potential duplicate pairs: {total_duplicates}")
+        console.print(f"High-confidence duplicates: {likely_duplicates}")
 
 
 def _display_console_results(results: list[Any], verbose: bool = False) -> None:
@@ -168,7 +220,46 @@ def _display_console_results(results: list[Any], verbose: bool = False) -> None:
         console.print(f"\n... and {len(results) - 10} more files with improvements")
 
 
-def _output_json_results(results: list[Any], output_file: Path | None) -> None:
+def _display_duplicate_results(results: list[Any], verbose: bool = False) -> None:
+    """Display duplicate detection results in console format."""
+    console.print("\n🔍 Duplicate Detection Results:")
+
+    for result in results[:10]:  # Show top 10 files with duplicates
+        console.print(f"\n📄 {result.file_path.name}")
+        console.print(f"  Potential duplicates: {len(result.potential_duplicates)}")
+        console.print(
+            f"  Likely duplicate: {'Yes' if result.is_likely_duplicate else 'No'}"
+        )
+
+        if verbose:
+            for i, duplicate in enumerate(result.potential_duplicates[:3], 1):
+                console.print(f"  {i}. {duplicate.file_path.name}")
+                console.print(f"     Similarity: {duplicate.similarity_score:.2f}")
+                console.print(f"     Match type: {duplicate.match_type}")
+                console.print(f"     Confidence: {duplicate.confidence:.2f}")
+                if duplicate.match_details:
+                    console.print(f"     Details: {duplicate.match_details}")
+
+            if len(result.potential_duplicates) > 3:
+                remaining = len(result.potential_duplicates) - 3
+                console.print(f"     ... and {remaining} more potential duplicates")
+
+            if result.merge_suggestions:
+                console.print("  Merge suggestions:")
+                for suggestion in result.merge_suggestions[:2]:
+                    console.print(f"    • {suggestion}")
+
+    if len(results) > 10:
+        console.print(
+            f"\n... and {len(results) - 10} more files with potential duplicates"
+        )
+
+
+def _output_json_results(
+    results: list[Any],
+    output_file: Path | None,
+    duplicate_results: list[Any] | None = None,
+) -> None:
     """Output organization results in JSON format."""
     output_data = {
         "summary": {
@@ -186,6 +277,38 @@ def _output_json_results(results: list[Any], output_file: Path | None) -> None:
             for result in results
         ],
     }
+
+    if duplicate_results:
+        output_data["duplicate_detection"] = {
+            "summary": {
+                "files_with_duplicates": len(duplicate_results),
+                "total_potential_duplicates": sum(
+                    len(r.potential_duplicates) for r in duplicate_results
+                ),
+                "high_confidence_duplicates": sum(
+                    1 for r in duplicate_results if r.is_likely_duplicate
+                ),
+            },
+            "duplicates": [
+                {
+                    "file_path": str(result.file_path),
+                    "is_likely_duplicate": result.is_likely_duplicate,
+                    "potential_duplicates": [
+                        {
+                            "file_path": str(dup.file_path),
+                            "similarity_score": dup.similarity_score,
+                            "match_type": dup.match_type,
+                            "confidence": dup.confidence,
+                            "match_details": dup.match_details,
+                        }
+                        for dup in result.potential_duplicates
+                    ],
+                    "merge_suggestions": result.merge_suggestions,
+                    "analysis_notes": result.analysis_notes,
+                }
+                for result in duplicate_results
+            ],
+        }
 
     if output_file:
         with output_file.open("w", encoding="utf-8") as f:

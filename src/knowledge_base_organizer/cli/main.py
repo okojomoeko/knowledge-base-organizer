@@ -607,6 +607,14 @@ def organize(
     create_backup: bool = typer.Option(
         True, "--backup/--no-backup", help="Create backup before applying changes"
     ),
+    detect_duplicates: bool = typer.Option(
+        False, "--detect-duplicates", help="Detect potential duplicate files"
+    ),
+    duplicate_threshold: float = typer.Option(
+        0.7,
+        "--duplicate-threshold",
+        help="Similarity threshold for duplicate detection (0.0-1.0)",
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
 ) -> None:
     """Automatically organize and improve knowledge base quality.
@@ -616,6 +624,10 @@ def organize(
     dry-run mode to preview changes or execute mode to apply improvements.
 
     Interactive mode allows reviewing each improvement before applying it.
+
+    Use --detect-duplicates to also scan for potential duplicate files based on
+    title, content, and filename similarity. The --duplicate-threshold option
+    controls how similar files need to be to be considered duplicates (0.7 = 70% similar).
     """
 
     organize_command(
@@ -629,6 +641,8 @@ def organize(
         max_improvements=max_improvements,
         verbose=verbose,
         create_backup=create_backup,
+        detect_duplicates=detect_duplicates,
+        duplicate_threshold=duplicate_threshold,
     )
 
 

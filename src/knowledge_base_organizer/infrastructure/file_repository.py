@@ -194,7 +194,9 @@ class FileRepository:
 
             if normalized_key in {"tags", "aliases"}:
                 if not isinstance(processed_value, list):
-                    processed_value = [processed_value] if processed_value is not None else []
+                    processed_value = (
+                        [processed_value] if processed_value is not None else []
+                    )
 
                 if existing_value:
                     if isinstance(existing_value, list):
@@ -204,7 +206,9 @@ class FileRepository:
 
                 if isinstance(processed_value, list):
                     processed_value = list(
-                        dict.fromkeys(item for item in processed_value if item is not None)
+                        dict.fromkeys(
+                            item for item in processed_value if item is not None
+                        )
                     )
 
             elif normalized_key == "publish" and isinstance(processed_value, str):

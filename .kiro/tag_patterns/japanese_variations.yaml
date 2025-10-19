@@ -1,0 +1,162 @@
+# Japanese Language Variation Patterns
+# ユーザーが自由に編集・拡張可能な日本語表記ゆれ辞書
+
+metadata:
+  version: "1.0.0"
+  description: "Japanese katakana and kanji variation patterns for WikiLink detection"
+  last_updated: "2025-01-19"
+  contributors: ["knowledge-base-organizer"]
+
+# カタカナ長音符のバリエーション
+long_vowel_patterns:
+  # インターフェース ↔ インターフェイス
+  "ー":
+    - ""      # 長音符なし
+    - "ウ"    # ウ音
+    - "ー"    # 長音符あり
+
+  # 逆パターン（ウ → ー変換）
+  "ウ":
+    - "ー"
+    - ""
+    - "ウ"
+
+# 子音のバリエーション
+consonant_patterns:
+  # サーヴィス ↔ サービス
+  "ヴ":
+    - "ブ"
+    - "バ"
+
+  # ディレクトリ ↔ デレクトリ
+  "ティ":
+    - "テ"
+
+  # フィルタ ↔ フルタ
+  "フィ":
+    - "フ"
+
+  # ウィンドウ ↔ ウンドウ
+  "ウィ":
+    - "ウ"
+
+  # シェア ↔ シエア
+  "シェ":
+    - "シエ"
+
+  # チェック ↔ チエック
+  "チェ":
+    - "チエ"
+
+# 英日対訳辞書
+english_japanese_pairs:
+  # プログラミング関連
+  "API":
+    japanese:
+      - "エーピーアイ"
+      - "アプリケーションプログラミングインターフェース"
+    aliases:
+      - "api"
+      - "Api"
+
+  "DB":
+    japanese:
+      - "データベース"
+      - "ディービー"
+    aliases:
+      - "db"
+      - "database"
+      - "Database"
+
+  "UI":
+    japanese:
+      - "ユーザーインターフェース"
+      - "ユーアイ"
+    aliases:
+      - "ui"
+      - "interface"
+
+  "URL":
+    japanese:
+      - "ユーアールエル"
+      - "ユニフォームリソースロケータ"
+    aliases:
+      - "url"
+      - "link"
+
+  "HTTP":
+    japanese:
+      - "エイチティーティーピー"
+      - "ハイパーテキストトランスファープロトコル"
+    aliases:
+      - "http"
+      - "https"
+
+  "JSON":
+    japanese:
+      - "ジェイソン"
+      - "ジャバスクリプトオブジェクトノーテーション"
+    aliases:
+      - "json"
+
+  "XML":
+    japanese:
+      - "エックスエムエル"
+      - "エクステンシブルマークアップランゲージ"
+    aliases:
+      - "xml"
+
+  "CSS":
+    japanese:
+      - "シーエスエス"
+      - "カスケーディングスタイルシート"
+    aliases:
+      - "css"
+      - "stylesheet"
+
+  "HTML":
+    japanese:
+      - "エイチティーエムエル"
+      - "ハイパーテキストマークアップランゲージ"
+    aliases:
+      - "html"
+      - "markup"
+
+  "SQL":
+    japanese:
+      - "エスキューエル"
+      - "ストラクチャードクエリーランゲージ"
+    aliases:
+      - "sql"
+      - "query"
+
+# 日本語固有の表記ゆれ
+japanese_specific_patterns:
+  # ひらがな・カタカナ混在
+  hiragana_katakana_pairs:
+    "データ":
+      - "でーた"
+    "システム":
+      - "しすてむ"
+    "プログラム":
+      - "ぷろぐらむ"
+
+  # 漢字・カタカナ混在
+  kanji_katakana_pairs:
+    "設計":
+      - "デザイン"
+    "実装":
+      - "インプリメンテーション"
+    "検証":
+      - "バリデーション"
+    "最適化":
+      - "オプティマイゼーション"
+
+# ユーザー定義パターン（空の場合はデフォルト）
+user_defined_patterns:
+  # ユーザーが独自に追加するパターン
+  # 例:
+  # custom_variations:
+  #   "マイパターン":
+  #     - "バリエーション1"
+  #     - "バリエーション2"

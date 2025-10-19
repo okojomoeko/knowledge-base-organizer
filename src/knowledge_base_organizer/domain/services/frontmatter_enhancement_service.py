@@ -37,6 +37,75 @@ class FrontmatterEnhancementService:
         self.content_analyzer = ContentAnalysisService()
         self.tag_pattern_manager = TagPatternManager(config_dir)
 
+        # Initialize English-Japanese translation patterns
+        self.english_japanese_patterns = self._load_english_japanese_patterns()
+
+    def _load_english_japanese_patterns(self) -> dict[str, list[str]]:
+        """Load English-Japanese translation patterns from TagPatternManager."""
+        try:
+            # Get Japanese variations from TagPatternManager
+            japanese_variations = self.tag_pattern_manager.japanese_variations
+            return japanese_variations.get("english_japanese_pairs", {})
+        except Exception as e:
+            print(f"Warning: Failed to load English-Japanese patterns: {e}")
+            return {}
+
+    def find_english_japanese_matches(self, content: str) -> list[tuple[str, str, str]]:
+        """Find English-Japanese term matches in content.
+
+        Returns:
+            List of tuples (original_term, matched_term, match_type)
+            match_type can be 'english_to_japanese' or 'japanese_to_english'
+        """
+        matches = []
+        content_lower = content.lower()
+
+        for english, japanese_terms in self.english_japanese_patterns.items():
+            english_lower = english.lower()
+
+            # Check for English term in content
+            if english_lower in content_lower:
+                for japanese_term in japanese_terms:
+                    if isinstance(japanese_term, str):
+                        matches.append((english, japanese_term, "english_to_japanese"))
+
+            # Check for Japanese terms in content
+            for japanese_term in japanese_terms:
+                if isinstance(japanese_term, str) and japanese_term in content:
+                    matches.append((japanese_term, english, "japanese_to_english"))
+
+        return matches
+
+    def suggest_cross_language_aliases(self, file: MarkdownFile) -> list[str]:
+        """Suggest cross-language aliases based on content analysis."""
+        suggested_aliases = []
+
+        # Find English-Japanese matches in content
+        matches = self.find_english_japanese_matches(file.content)
+
+        # Also check existing aliases for cross-language opportunities
+        existing_aliases = file.frontmatter.aliases or []
+
+        for original_term, matched_term, match_type in matches:
+            # Suggest the matched term as an alias if not already present
+            if (
+                matched_term not in existing_aliases
+                and matched_term not in suggested_aliases
+            ):
+                suggested_aliases.append(matched_term)
+
+        # Check existing aliases for potential cross-language matches
+        for alias in existing_aliases:
+            variations = self.tag_pattern_manager.find_japanese_variations(alias)
+            for variation in variations:
+                if (
+                    variation not in existing_aliases
+                    and variation not in suggested_aliases
+                ):
+                    suggested_aliases.append(variation)
+
+        return suggested_aliases
+
         # Legacy advanced tag patterns (kept for backward compatibility)
         self.advanced_tag_patterns = {
             "programming_languages": {
@@ -395,7 +464,22 @@ class FrontmatterEnhancementService:
                     enhanced_frontmatter[field_name] = date_value
                     changes_applied.append(f"Added date {field_name}: {date_value}")
 
-            # 4. Apply improvements from content analysis (Requirement 8.1)
+            # 4. Apply English-Japanese cross-language alias suggestions (Requirement 19.2)
+            cross_language_aliases = self.suggest_cross_language_aliases(file)
+            if cross_language_aliases:
+                current_aliases = enhanced_frontmatter.get("aliases", [])
+                new_aliases = [
+                    alias
+                    for alias in cross_language_aliases
+                    if alias not in current_aliases
+                ]
+                if new_aliases:
+                    enhanced_frontmatter["aliases"] = current_aliases + new_aliases
+                    changes_applied.append(
+                        f"Added cross-language aliases: {new_aliases}"
+                    )
+
+            # 5. Apply improvements from content analysis (Requirement 8.1)
             for improvement in analysis_result.improvements:
                 if (
                     improvement.confidence >= 0.7

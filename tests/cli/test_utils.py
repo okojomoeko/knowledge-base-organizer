@@ -1,7 +1,6 @@
 """CLI テスト用のユーティリティ関数"""
 
 import contextlib
-import glob
 import json
 import re
 from pathlib import Path
