@@ -8,6 +8,27 @@ The application prioritizes frontmatter standardization, intelligent WikiLink ge
 
 ## Requirements
 
+### 🎯 実装優先度について
+
+**✅ 完全実装済み (Phase 1-11)**
+
+- Requirements 1-12: 基本機能群（frontmatter検証、auto-link、dead link検出等）
+
+**🚀 最優先実装 (Phase 12 - 即座に着手可能)**
+
+- Requirements 19: 日本語処理強化（既存コード拡張、軽量実装）
+
+**🔶 中優先実装 (Phase 13-14)**
+
+- Requirements 17: インテリジェントfrontmatter強化（既存サービス拡張）
+- Requirements 20: 自動メンテナンスシステム（既存organize機能拡張）
+
+**⏳ 長期実装 (Phase 15-17 - ollama/LLM活用)**
+
+- Requirements 13-16: セマンティック分析（ollama + local LLM使用）
+- Requirements 18: 関係性発見システム（LLM活用）
+- Requirements 21: 高度コンテキスト理解（LLM活用）
+
 ### Requirement 1
 
 **User Story:** As an Obsidian user, I want to validate and fix frontmatter in my notes according to template-based schemas, so that my knowledge base maintains consistent metadata structure without corrupting existing valid frontmatter.
@@ -185,10 +206,10 @@ The application prioritizes frontmatter standardization, intelligent WikiLink ge
 
 #### Acceptance Criteria
 
-1.  WHEN scanning for link candidates, THEN the system SHALL analyze the surrounding text of the candidate (e.g., the paragraph).
-2.  WHEN a candidate is found, THEN the system SHALL calculate the semantic similarity between the source context and the content of the target note.
-3.  WHEN a similarity score is calculated, THEN the system SHALL only create a link if the score exceeds a configurable confidence threshold (e.g., 0.7).
-4.  WHEN a link is created based on semantic similarity, THEN the system's report SHALL indicate the confidence score.
+1. WHEN scanning for link candidates, THEN the system SHALL analyze the surrounding text of the candidate (e.g., the paragraph).
+2. WHEN a candidate is found, THEN the system SHALL calculate the semantic similarity between the source context and the content of the target note.
+3. WHEN a similarity score is calculated, THEN the system SHALL only create a link if the score exceeds a configurable confidence threshold (e.g., 0.7).
+4. WHEN a link is created based on semantic similarity, THEN the system's report SHALL indicate the confidence score.
 
 ### Requirement 14: Link Disambiguation
 
@@ -196,10 +217,10 @@ The application prioritizes frontmatter standardization, intelligent WikiLink ge
 
 #### Acceptance Criteria
 
-1.  WHEN a link candidate could match multiple target notes, THEN the system SHALL use semantic context similarity to rank the potential targets.
-2.  WHEN running in automatic mode, THEN the system SHALL link to the target with the highest similarity score, provided it is above the confidence threshold.
-3.  WHEN running in an interactive mode, THEN the system SHALL prompt the user to choose from the top-ranked targets if their similarity scores are close.
-4.  WHEN no single target has a sufficiently high confidence score, THEN no link SHALL be created.
+1. WHEN a link candidate could match multiple target notes, THEN the system SHALL use semantic context similarity to rank the potential targets.
+2. WHEN running in automatic mode, THEN the system SHALL link to the target with the highest similarity score, provided it is above the confidence threshold.
+3. WHEN running in an interactive mode, THEN the system SHALL prompt the user to choose from the top-ranked targets if their similarity scores are close.
+4. WHEN no single target has a sufficiently high confidence score, THEN no link SHALL be created.
 
 ### Requirement 15: Proactive Alias Suggestion
 
@@ -207,9 +228,9 @@ The application prioritizes frontmatter standardization, intelligent WikiLink ge
 
 #### Acceptance Criteria
 
-1.  WHEN analyzing the vault, THEN the system SHALL identify terms that are not existing aliases but frequently appear in contexts semantically similar to a target note.
-2.  WHEN a potential new alias is identified (e.g., "ML" for "Machine Learning"), THEN the system SHALL suggest adding the new term to the target note's `aliases` frontmatter field.
-3.  WHEN running in an interactive mode, THEN the user SHALL be prompted to accept or reject the alias suggestion.
+1. WHEN analyzing the vault, THEN the system SHALL identify terms that are not existing aliases but frequently appear in contexts semantically similar to a target note.
+2. WHEN a potential new alias is identified (e.g., "ML" for "Machine Learning"), THEN the system SHALL suggest adding the new term to the target note's `aliases` frontmatter field.
+3. WHEN running in an interactive mode, THEN the user SHALL be prompted to accept or reject the alias suggestion.
 
 ### Requirement 16: Section-Level Linking
 
@@ -217,6 +238,76 @@ The application prioritizes frontmatter standardization, intelligent WikiLink ge
 
 #### Acceptance Criteria
 
-1.  WHEN analyzing a link candidate, THEN the system SHALL compare the source context's semantic similarity against each section (delimited by headers) of the target note.
-2.  WHEN the similarity to a specific section is significantly higher than to the note as a whole, THEN the system SHALL generate a header link (e.g., `[[NOTE_ID#Section Title]]`).
-3.  WHEN generating a header link, THEN the system SHALL ensure the header text is correctly formatted for URL fragments.
+1. WHEN analyzing a link candidate, THEN the system SHALL compare the source context's semantic similarity against each section (delimited by headers) of the target note.
+2. WHEN the similarity to a specific section is significantly higher than to the note as a whole, THEN the system SHALL generate a header link (e.g., `[[NOTE_ID#Section Title]]`).
+3. WHEN generating a header link, THEN the system SHALL ensure the header text is correctly formatted for URL fragments.
+
+### Requirement 17: Intelligent Frontmatter Auto-Enhancement
+
+**User Story:** As an Obsidian user, I want the system to automatically enhance my frontmatter with intelligent suggestions based on content analysis, so that my notes are properly categorized and discoverable without manual effort.
+
+#### Acceptance Criteria
+
+1. WHEN analyzing note content, THEN the system SHALL extract key concepts and suggest relevant tags based on semantic analysis
+2. WHEN a note lacks a description field, THEN the system SHALL generate a concise description from the first paragraph or key sentences
+3. WHEN detecting related notes through content similarity, THEN the system SHALL suggest bidirectional aliases to improve discoverability
+4. WHEN finding notes with similar topics, THEN the system SHALL suggest consistent tag hierarchies and category structures
+5. WHEN processing notes in specific directories, THEN the system SHALL apply directory-specific enhancement rules and templates
+6. WHEN enhancement suggestions are generated, THEN the system SHALL provide confidence scores and allow selective application
+7. WHEN applying enhancements, THEN the system SHALL preserve existing valid metadata and only add missing or improved fields
+
+### Requirement 18: Content-Based Relationship Discovery
+
+**User Story:** As an Obsidian user, I want the system to automatically discover and create relationships between my notes based on content similarity and conceptual connections, so that my knowledge base becomes a truly interconnected second brain.
+
+#### Acceptance Criteria
+
+1. WHEN analyzing vault content, THEN the system SHALL identify conceptually related notes using semantic similarity analysis
+2. WHEN related notes are found, THEN the system SHALL suggest automatic WikiLink creation with appropriate context
+3. WHEN processing notes, THEN the system SHALL detect implicit references to concepts covered in other notes
+4. WHEN finding content gaps, THEN the system SHALL suggest note creation opportunities and provide templates
+5. WHEN analyzing note clusters, THEN the system SHALL recommend tag consolidation and hierarchy improvements
+6. WHEN discovering relationships, THEN the system SHALL create bidirectional connections and update both source and target notes
+7. WHEN relationship confidence is low, THEN the system SHALL present suggestions for user review rather than automatic application
+
+### Requirement 19: Advanced Japanese Language Processing
+
+**User Story:** As an Obsidian user working with Japanese content, I want sophisticated language processing that handles variations, synonyms, and cultural context, so that my Japanese knowledge base maintains the same quality as English content.
+
+#### Acceptance Criteria
+
+1. WHEN processing Japanese text, THEN the system SHALL detect and link katakana variations (e.g., インターフェース ↔ インターフェイス)
+2. WHEN finding technical terms, THEN the system SHALL match English-Japanese pairs and create appropriate cross-references
+3. WHEN analyzing content, THEN the system SHALL handle honorific variations and formal/informal language differences
+4. WHEN processing compound words, THEN the system SHALL break down and match component parts for better linking
+5. WHEN detecting abbreviations, THEN the system SHALL expand and link to full forms (e.g., DB → データベース)
+6. WHEN finding synonyms, THEN the system SHALL suggest bidirectional alias additions to improve discoverability
+7. WHEN processing mixed-language content, THEN the system SHALL maintain context awareness across language boundaries
+
+### Requirement 20: Automated Knowledge Base Maintenance
+
+**User Story:** As an Obsidian user, I want my knowledge base to maintain itself automatically through continuous monitoring and improvement, so that it remains organized and high-quality without constant manual intervention.
+
+#### Acceptance Criteria
+
+1. WHEN running maintenance, THEN the system SHALL detect and fix broken internal references automatically
+2. WHEN analyzing content quality, THEN the system SHALL identify and merge duplicate or highly similar notes
+3. WHEN processing tags, THEN the system SHALL automatically consolidate synonymous tags and maintain hierarchy consistency
+4. WHEN detecting orphaned notes, THEN the system SHALL suggest connections based on content analysis and create appropriate links
+5. WHEN finding outdated information, THEN the system SHALL flag notes for review and suggest updates based on newer content
+6. WHEN analyzing vault structure, THEN the system SHALL recommend and apply file organization improvements
+7. WHEN maintenance is complete, THEN the system SHALL generate comprehensive reports showing all improvements made
+
+### Requirement 21: Contextual Link Intelligence
+
+**User Story:** As an Obsidian user, I want the system to understand context when creating links, so that it only creates meaningful connections and avoids false positives like linking "apple" the fruit to "Apple Inc."
+
+#### Acceptance Criteria
+
+1. WHEN analyzing potential links, THEN the system SHALL evaluate semantic context using surrounding paragraphs and document themes
+2. WHEN multiple targets exist for a term, THEN the system SHALL rank candidates by contextual relevance and confidence scores
+3. WHEN context is ambiguous, THEN the system SHALL present disambiguation options rather than making incorrect automatic links
+4. WHEN creating links, THEN the system SHALL consider document categories, tags, and directory structure for context clues
+5. WHEN processing technical content, THEN the system SHALL maintain domain-specific context awareness (e.g., programming vs. cooking)
+6. WHEN link confidence is below threshold, THEN the system SHALL skip automatic linking and suggest manual review
+7. WHEN context analysis is complete, THEN the system SHALL provide detailed reasoning for link creation decisions

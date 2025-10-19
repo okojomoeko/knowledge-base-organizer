@@ -1093,3 +1093,555 @@ class AdvancedProcessingConfig(ProcessingConfig):
 - Lazy loading of synonym patterns
 - Garbage collection of intermediate results
 - Configurable batch sizes based on available memory
+
+## Enhanced Architecture for Second Brain Automation
+
+### Semantic Analysis Infrastructure
+
+**Embedding Service Architecture:**
+
+```python
+class SemanticAnalysisService:
+    def __init__(self, model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
+        self.model = SentenceTransformer(model_name)
+        self.embedding_cache = EmbeddingCache()
+        self.context_analyzer = ContextAnalyzer()
+
+    def get_document_embedding(self, content: str) -> np.ndarray:
+        """Generate embedding for entire document"""
+
+    def get_section_embeddings(self, content: str) -> Dict[str, np.ndarray]:
+        """Generate embeddings for each section (header-delimited)"""
+
+    def calculate_contextual_similarity(
+        self,
+        source_context: str,
+        target_content: str,
+        context_window: int = 3
+    ) -> float:
+        """Calculate similarity with contextual awareness"""
+
+    def analyze_domain_context(self, content: str) -> DomainContext:
+        """Determine domain/topic context for better disambiguation"""
+```
+
+### Intelligent Frontmatter Enhancement
+
+**Content Analysis Pipeline:**
+
+```python
+class IntelligentFrontmatterEnhancer:
+    def __init__(
+        self,
+        semantic_service: SemanticAnalysisService,
+        tag_pattern_manager: TagPatternManager,
+        content_analyzer: ContentAnalysisService
+    ):
+        self.semantic_service = semantic_service
+        self.tag_pattern_manager = tag_pattern_manager
+        self.content_analyzer = content_analyzer
+
+    def enhance_frontmatter(
+        self,
+        file: MarkdownFile,
+        vault_context: VaultContext
+    ) -> FrontmatterEnhancement:
+        """Generate intelligent frontmatter enhancements"""
+
+        # 1. Extract key concepts and suggest tags
+        concepts = self.content_analyzer.extract_key_concepts(file.content)
+        suggested_tags = self.tag_pattern_manager.suggest_tags(concepts, vault_context)
+
+        # 2. Generate description if missing
+        description = self._generate_description(file.content) if not file.frontmatter.description else None
+
+        # 3. Find related notes and suggest aliases
+        related_notes = self._find_related_notes(file, vault_context)
+        suggested_aliases = self._suggest_bidirectional_aliases(file, related_notes)
+
+        # 4. Apply directory-specific rules
+        directory_enhancements = self._apply_directory_rules(file.path, vault_context)
+
+        return FrontmatterEnhancement(
+            suggested_tags=suggested_tags,
+            generated_description=description,
+            suggested_aliases=suggested_aliases,
+            directory_enhancements=directory_enhancements,
+            confidence_scores=self._calculate_confidence_scores(...)
+        )
+```
+
+### Relationship Discovery System
+
+**Conceptual Relationship Engine:**
+
+```python
+class RelationshipDiscoveryService:
+    def __init__(
+        self,
+        semantic_service: SemanticAnalysisService,
+        link_analysis_service: LinkAnalysisService
+    ):
+        self.semantic_service = semantic_service
+        self.link_analysis_service = link_analysis_service
+
+    def discover_relationships(
+        self,
+        vault: List[MarkdownFile]
+    ) -> List[ConceptualRelationship]:
+        """Discover conceptual relationships between notes"""
+
+        # 1. Build semantic similarity matrix
+        similarity_matrix = self._build_similarity_matrix(vault)
+
+        # 2. Identify clusters and themes
+        clusters = self._identify_content_clusters(similarity_matrix)
+
+        # 3. Find implicit references
+        implicit_refs = self._find_implicit_references(vault)
+
+        # 4. Detect content gaps and opportunities
+        gaps = self._detect_content_gaps(clusters, vault)
+
+        return self._generate_relationship_suggestions(
+            clusters, implicit_refs, gaps
+        )
+
+    def create_bidirectional_links(
+        self,
+        relationships: List[ConceptualRelationship],
+        confidence_threshold: float = 0.7
+    ) -> List[FileUpdate]:
+        """Create bidirectional links for high-confidence relationships"""
+```
+
+### Japanese Language Processing Enhancement
+
+**Advanced Japanese Language Service:**
+
+```python
+class AdvancedJapaneseLanguageService:
+    def __init__(self):
+        self.katakana_processor = KatakanaVariationProcessor()
+        self.english_japanese_mapper = EnglishJapaneseMapper()
+        self.compound_analyzer = CompoundWordAnalyzer()
+        self.honorific_handler = HonorificVariationHandler()
+
+    def find_japanese_variations(
+        self,
+        text: str,
+        file_registry: Dict[str, MarkdownFile]
+    ) -> List[JapaneseVariationMatch]:
+        """Find all Japanese language variations and matches"""
+
+        matches = []
+
+        # 1. Katakana variations (インターフェース ↔ インターフェイス)
+        matches.extend(self.katakana_processor.find_variations(text, file_registry))
+
+        # 2. English-Japanese pairs (API ↔ エーピーアイ)
+        matches.extend(self.english_japanese_mapper.find_pairs(text, file_registry))
+
+        # 3. Compound word components (データベース → DB, database)
+        matches.extend(self.compound_analyzer.find_components(text, file_registry))
+
+        # 4. Honorific variations (です/である forms)
+        matches.extend(self.honorific_handler.find_variations(text, file_registry))
+
+        return self._rank_by_confidence(matches)
+
+    def suggest_japanese_aliases(
+        self,
+        file: MarkdownFile,
+        vault_context: VaultContext
+    ) -> List[JapaneseAliassuggestion]:
+        """Suggest Japanese aliases based on content analysis"""
+```
+
+### Automated Maintenance Engine
+
+**Continuous Maintenance Architecture:**
+
+```python
+class AutomatedMaintenanceEngine:
+    def __init__(
+        self,
+        relationship_service: RelationshipDiscoveryService,
+        quality_analyzer: ContentQualityAnalyzer,
+        structural_optimizer: StructuralOptimizer
+    ):
+        self.relationship_service = relationship_service
+        self.quality_analyzer = quality_analyzer
+        self.structural_optimizer = structural_optimizer
+
+    def run_maintenance_cycle(
+        self,
+        vault: List[MarkdownFile],
+        maintenance_config: MaintenanceConfig
+    ) -> MaintenanceReport:
+        """Run a complete maintenance cycle"""
+
+        report = MaintenanceReport()
+
+        # 1. Fix broken references
+        broken_refs = self._detect_broken_references(vault)
+        fixed_refs = self._auto_fix_references(broken_refs)
+        report.add_fixes("broken_references", fixed_refs)
+
+        # 2. Merge duplicate notes
+        duplicates = self.quality_analyzer.find_duplicates(vault)
+        merges = self._suggest_merges(duplicates)
+        report.add_suggestions("duplicate_merges", merges)
+
+        # 3. Consolidate tags
+        tag_issues = self._analyze_tag_consistency(vault)
+        tag_fixes = self._consolidate_tags(tag_issues)
+        report.add_fixes("tag_consolidation", tag_fixes)
+
+        # 4. Connect orphaned notes
+        orphans = self._find_orphaned_notes(vault)
+        connections = self.relationship_service.suggest_connections(orphans)
+        report.add_suggestions("orphan_connections", connections)
+
+        # 5. Optimize structure
+        structural_issues = self.structural_optimizer.analyze_structure(vault)
+        optimizations = self.structural_optimizer.suggest_improvements(structural_issues)
+        report.add_suggestions("structural_optimizations", optimizations)
+
+        return report
+```
+
+### Contextual Intelligence Framework
+
+**Advanced Context Analysis:**
+
+```python
+class ContextualIntelligenceService:
+    def __init__(
+        self,
+        semantic_service: SemanticAnalysisService,
+        domain_classifier: DomainClassifier
+    ):
+        self.semantic_service = semantic_service
+        self.domain_classifier = domain_classifier
+
+    def analyze_link_context(
+        self,
+        candidate: LinkCandidate,
+        source_file: MarkdownFile,
+        target_file: MarkdownFile
+    ) -> ContextualAnalysis:
+        """Perform deep contextual analysis for link candidates"""
+
+        # 1. Extract surrounding context (3 paragraphs)
+        source_context = self._extract_context_window(
+            candidate.position, source_file.content, window_size=3
+        )
+
+        # 2. Classify domain/topic
+        source_domain = self.domain_classifier.classify(source_context)
+        target_domain = self.domain_classifier.classify(target_file.content)
+
+        # 3. Calculate semantic similarity with context
+        similarity = self.semantic_service.calculate_contextual_similarity(
+            source_context, target_file.content
+        )
+
+        # 4. Check for disambiguation needs
+        disambiguation_needed = self._check_disambiguation_needs(
+            candidate.text, source_domain, target_domain
+        )
+
+        # 5. Generate confidence score
+        confidence = self._calculate_contextual_confidence(
+            similarity, source_domain, target_domain, disambiguation_needed
+        )
+
+        return ContextualAnalysis(
+            similarity_score=similarity,
+            source_domain=source_domain,
+            target_domain=target_domain,
+            confidence_score=confidence,
+            disambiguation_needed=disambiguation_needed,
+            reasoning=self._generate_reasoning(...)
+        )
+```
+
+### Integration Architecture
+
+**Unified Second Brain Automation:**
+
+```python
+class SecondBrainAutomationOrchestrator:
+    """Orchestrates all automation features for seamless second brain maintenance"""
+
+    def __init__(self, config: AutomationConfig):
+        self.semantic_service = SemanticAnalysisService(config.model_name)
+        self.frontmatter_enhancer = IntelligentFrontmatterEnhancer(...)
+        self.relationship_discoverer = RelationshipDiscoveryService(...)
+        self.japanese_processor = AdvancedJapaneseLanguageService()
+        self.maintenance_engine = AutomatedMaintenanceEngine(...)
+        self.contextual_intelligence = ContextualIntelligenceService(...)
+
+    def run_full_automation(
+        self,
+        vault_path: Path,
+        automation_level: AutomationLevel = AutomationLevel.CONSERVATIVE
+    ) -> AutomationReport:
+        """Run complete second brain automation"""
+
+        # 1. Load and analyze vault
+        vault = self._load_vault(vault_path)
+
+        # 2. Enhance frontmatter intelligently
+        frontmatter_enhancements = self.frontmatter_enhancer.enhance_all(vault)
+
+        # 3. Discover and create relationships
+        relationships = self.relationship_discoverer.discover_relationships(vault)
+
+        # 4. Process Japanese content
+        japanese_enhancements = self.japanese_processor.enhance_japanese_content(vault)
+
+        # 5. Create contextually intelligent links
+        intelligent_links = self._create_contextual_links(vault)
+
+        # 6. Run maintenance cycle
+        maintenance_report = self.maintenance_engine.run_maintenance_cycle(vault)
+
+        # 7. Apply changes based on automation level
+        applied_changes = self._apply_changes(
+            frontmatter_enhancements,
+            relationships,
+            japanese_enhancements,
+            intelligent_links,
+            maintenance_report,
+            automation_level
+        )
+
+        return AutomationReport(
+            vault_path=vault_path,
+            changes_applied=applied_changes,
+            suggestions_pending=self._get_pending_suggestions(),
+            quality_metrics=self._calculate_quality_metrics(vault),
+            automation_level=automation_level
+        )
+```
+
+This enhanced architecture transforms the knowledge base organizer into a true "second brain" automation system that can intelligently maintain, enhance, and interconnect your Obsidian vault with minimal manual intervention.
+
+## 🚀 段階的実装戦略
+
+### Phase 12: セマンティック分析基盤 (最優先)
+
+**既存コード活用アプローチ:**
+
+```python
+# 既存のLinkAnalysisServiceを拡張
+class LinkAnalysisService:
+    def __init__(self, exclude_tables: bool = False, semantic_service: SemanticAnalysisService = None):
+        self.exclude_tables = exclude_tables
+        self.semantic_service = semantic_service  # 新規追加
+
+    def find_link_candidates(self, content: str, file_registry: dict) -> list[LinkCandidate]:
+        # 既存のロジック
+        basic_candidates = self._find_basic_candidates(content, file_registry)
+
+        # セマンティック分析を追加（オプション）
+        if self.semantic_service:
+            enhanced_candidates = self._enhance_with_semantics(basic_candidates, content)
+            return enhanced_candidates
+
+        return basic_candidates
+```
+
+**新規実装が必要な最小限のコンポーネント:**
+
+```python
+# 新規: 軽量セマンティック分析サービス
+class SemanticAnalysisService:
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
+        from sentence_transformers import SentenceTransformer
+        self.model = SentenceTransformer(model_name)
+        self.cache = {}  # シンプルなメモリキャッシュ
+
+    def calculate_similarity(self, text1: str, text2: str) -> float:
+        """基本的なコサイン類似度計算"""
+        if (text1, text2) in self.cache:
+            return self.cache[(text1, text2)]
+
+        embeddings = self.model.encode([text1, text2])
+        similarity = cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
+        self.cache[(text1, text2)] = similarity
+        return similarity
+```
+
+### Phase 13: 日本語処理強化
+
+**既存のTagPatternManagerを拡張:**
+
+```python
+# 既存のTagPatternManagerに日本語機能を追加
+class TagPatternManager:
+    def __init__(self, config_dir: Path = None):
+        # 既存の初期化
+        self.japanese_processor = JapaneseVariationProcessor()  # 新規追加
+
+    def find_tag_suggestions(self, content: str) -> list[str]:
+        # 既存のロジック
+        basic_suggestions = self._find_basic_suggestions(content)
+
+        # 日本語バリエーション処理を追加
+        japanese_suggestions = self.japanese_processor.find_variations(content)
+
+        return basic_suggestions + japanese_suggestions
+
+# 新規: 日本語バリエーション処理
+class JapaneseVariationProcessor:
+    def __init__(self):
+        self.katakana_patterns = {
+            'ー': ['', 'ウ', 'ー'],  # インターフェース ↔ インターフェイス
+            'ヴ': ['ブ', 'バ'],     # サーヴィス ↔ サービス
+        }
+
+    def find_variations(self, text: str) -> list[str]:
+        """カタカナ表記ゆれを検出"""
+        variations = []
+        # 実装詳細...
+        return variations
+```
+
+### Phase 14: インテリジェントfrontmatter強化
+
+**既存のFrontmatterEnhancementServiceを拡張:**
+
+```python
+# 既存のFrontmatterEnhancementServiceにAI機能を追加
+class FrontmatterEnhancementService:
+    def __init__(self, config_dir: Path = None, semantic_service: SemanticAnalysisService = None):
+        # 既存の初期化
+        self.semantic_service = semantic_service  # 新規追加
+
+    def enhance_frontmatter(self, file: MarkdownFile, vault_context: dict = None) -> EnhancementResult:
+        # 既存のロジック
+        basic_enhancements = self._basic_enhancement(file)
+
+        # セマンティック強化を追加（オプション）
+        if self.semantic_service and vault_context:
+            semantic_enhancements = self._semantic_enhancement(file, vault_context)
+            return self._merge_enhancements(basic_enhancements, semantic_enhancements)
+
+        return basic_enhancements
+```
+
+### 実装の利点
+
+1. **既存コードの保護**: 既存の機能は一切破壊しない
+2. **段階的導入**: 各機能はオプションとして追加
+3. **後方互換性**: 既存のCLIコマンドは変更なしで動作
+4. **テスト容易性**: 新機能は独立してテスト可能
+5. **パフォーマンス**: AI機能は必要時のみ有効化
+
+### 依存関係の最小化
+
+```toml
+# pyproject.toml - 段階的依存関係追加
+[project]
+dependencies = [
+    "pydantic>=2.11.9",
+    "typer>=0.19.2",
+    "rich>=13.0.0",
+    "pyyaml>=6.0.0",
+    # Phase 12で追加
+    "sentence-transformers>=2.2.0",  # セマンティック分析用
+    "scikit-learn>=1.3.0",          # コサイン類似度計算用
+]
+```
+
+この段階的アプローチにより、既存の安定した機能を保持しながら、高度なAI機能を段階的に追加できます。
+
+## 🚀 修正された実装戦略
+
+### Phase 12: 日本語処理強化 (最優先・軽量)
+
+**理由**: 既存の基本的な日本語処理を拡張するだけで大幅な機能向上が可能。重い依存関係不要。
+
+```python
+# 既存のTagPatternManagerを拡張
+class TagPatternManager:
+    def __init__(self, config_dir: Path = None):
+        # 既存の初期化
+        self.japanese_variations = self._load_japanese_patterns()  # 新規追加
+
+    def find_japanese_variations(self, text: str) -> list[str]:
+        """日本語バリエーションを検出（軽量実装）"""
+        variations = []
+        # カタカナ表記ゆれ処理（純粋Python）
+        if 'ー' in text:
+            variations.append(text.replace('ー', ''))  # インターフェース → インターフェイス
+        if 'ヴ' in text:
+            variations.append(text.replace('ヴ', 'ブ'))  # サーヴィス → サービス
+        return variations
+```
+
+### Phase 15: ollama活用セマンティック分析 (長期・軽量)
+
+**ollama + local LLMアプローチ:**
+
+```python
+# 新規: ollama連携サービス（軽量・依存関係最小）
+class OllamaSemanticService:
+    def __init__(self, base_url: str = "http://localhost:11434"):
+        self.base_url = base_url
+        self.embedding_model = "nomic-embed-text"
+        self.chat_model = "llama3.2:3b"
+
+    def analyze_relationship(self, text1: str, text2: str) -> dict:
+        """LLMで関係性分析"""
+        import requests
+        prompt = f"""
+        以下の2つのテキストの関係性を分析してください：
+
+        テキスト1: {text1[:200]}...
+        テキスト2: {text2[:200]}...
+
+        関係性スコア（0-1）と理由を簡潔に回答してください。
+        """
+
+        response = requests.post(f"{self.base_url}/api/generate", json={
+            "model": self.chat_model,
+            "prompt": prompt,
+            "stream": False
+        })
+        return {"score": 0.8, "reason": response.json()["response"]}
+```
+
+### 依存関係の最小化
+
+```toml
+# pyproject.toml - 段階的依存関係追加
+[project]
+dependencies = [
+    "pydantic>=2.11.9",
+    "typer>=0.19.2",
+    "rich>=13.0.0",
+    "pyyaml>=6.0.0",
+    "requests>=2.31.0",  # ollama API用（既存）
+    # Phase 15でollama使用（外部インストール）
+    # 重い依存関係は不要！
+]
+
+# 外部要件（ユーザーがインストール）
+# ollama install
+# ollama pull nomic-embed-text
+# ollama pull llama3.2:3b
+```
+
+### 実装の利点
+
+1. **軽量**: 重い機械学習ライブラリ不要
+2. **柔軟**: 異なるLLMモデルを簡単に切り替え可能
+3. **ローカル**: プライバシー保護、オフライン動作
+4. **段階的**: ollama未インストール時は基本機能のみ動作
+5. **コスト効率**: 外部API不要
+
+この修正されたアプローチにより、既存の安定した機能を保持しながら、軽量で実用的なAI機能を段階的に追加できます。

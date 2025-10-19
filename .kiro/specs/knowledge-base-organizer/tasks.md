@@ -321,34 +321,194 @@
         - Create troubleshooting guide
         - _Requirements: 5.6, 6.6_
 
-## Phase 12: Semantic Auto-Linking
+## Phase 12: 日本語処理大幅強化 (最優先 - 即座に着手可能)
 
-- [ ] 13. Implement Semantic Analysis Service
-    - [ ] 13.1 Set up embedding model infrastructure
-        - Choose and integrate a sentence-transformer model.
-        - Implement `SemanticAnalysisService` to generate and cache vector embeddings for notes and sections.
-        - _Requirements: FR-13_
-    - [ ] 13.2 Implement Context-Aware Candidate Validation
-        - In `LinkAnalysisService`, use `SemanticAnalysisService` to calculate cosine similarity between source context and target note.
-        - Filter candidates based on a configurable confidence threshold.
-        - _Requirements: FR-13_
+**理由**: 既存の基本的な日本語処理を拡張するだけで大幅な機能向上が可能。重い依存関係不要。
 
-- [ ] 14. Implement Advanced Linking Features
-    - [ ] 14.1 Implement Link Disambiguation
-        - In `AutoLinkGenerationUseCase`, handle candidates with multiple potential targets.
-        - Implement ranking based on semantic score.
-        - Add interactive prompt for user to select the correct link when scores are close.
-        - _Requirements: FR-14_
-    - [ ] 14.2 Implement Section-Level Linking
-        - Enhance `SemanticAnalysisService` to generate embeddings for note sections (headers).
-        - In `LinkAnalysisService`, compare source context with target sections.
-        - Generate header links (`[[ID#Section]]`) when a section is a strong match.
-        - _Requirements: FR-16_
-    - [ ] 14.3 Implement Proactive Alias Suggestion
-        - Create a new `AliasSuggestionUseCase`.
-        - Implement logic to analyze the entire vault for terms frequently used in semantically similar contexts to a note.
-        - Add a new CLI command `suggest-aliases` to present suggestions to the user.
-        - _Requirements: FR-15_
+- [ ] 12. 高度日本語言語処理の実装（軽量・即効性重視）
+    - [ ] 12.1 カタカナ表記ゆれ検出エンジン（最優先）
+        - 既存のTagPatternManagerにカタカナバリエーション機能を追加
+        - 長音符パターン辞書（インターフェース ↔ インターフェイス）
+        - 子音バリエーション辞書（ヴ ↔ ブ、ティ ↔ テ）
+        - 既存のfind_tag_suggestionsメソッドに統合
+        - **依存関係**: なし（純粋なPython実装）
+        - _Requirements: 19.1, 19.6_
+        - _既存コード拡張: TagPatternManager.py 約50行追加_
+
+    - [ ] 12.2 英日対訳システムの実装（高優先）
+        - 技術用語辞書をYAMLファイルで管理（API ↔ エーピーアイ）
+        - 略語展開辞書（DB → データベース）
+        - 既存のFrontmatterEnhancementServiceに統合
+        - **依存関係**: なし（辞書ファイル + 既存YAML処理）
+        - _Requirements: 19.2, 19.4, 19.5_
+        - _既存コード拡張: FrontmatterEnhancementService.py 約30行追加_
+
+    - [ ] 12.3 日本語処理のauto-link統合（中優先）
+        - 既存のLinkAnalysisService.find_link_candidatesに日本語バリエーション追加
+        - カタカナ・英日対訳を使った候補拡張
+        - 双方向エイリアス提案機能
+        - **依存関係**: なし（上記12.1, 12.2の機能活用）
+        - _Requirements: 19.3, 19.7_
+        - _既存コード拡張: LinkAnalysisService.py 約40行追加_
+
+## Phase 13: インテリジェントfrontmatter強化 (中優先)
+
+- [ ] 13. 既存frontmatter機能のAI強化
+    - [ ] 13.1 セマンティックタグ提案システム
+        - 既存のContentAnalysisServiceにセマンティック分析を統合
+        - コンテンツからキーコンセプト抽出
+        - 既存タグパターンとの類似度ベース提案
+        - TagPatternManagerの階層一貫性チェック強化
+        - _Requirements: 17.1, 17.4, 18.5_
+        - _既存コード拡張: ContentAnalysisService + TagPatternManager強化_
+
+    - [ ] 13.2 自動説明文生成機能
+        - 第一段落からの要約生成（ルールベース）
+        - キーセンテンス抽出による説明文作成
+        - 品質スコアリングシステム
+        - 既存のFrontmatterEnhancementServiceに統合
+        - _Requirements: 17.2_
+        - _既存コード拡張: FrontmatterEnhancementService強化_
+
+    - [ ] 13.3 enhance-frontmatterコマンドの高度化
+        - organizeコマンドにセマンティック強化オプションを追加
+        - 信頼度スコアと選択的適用機能
+        - ディレクトリ固有の強化ルール
+        - _Requirements: 17.5, 17.6, 17.7_
+        - _既存コード拡張: organize_command.py強化_
+
+## Phase 14: 自動メンテナンスシステム強化 (中優先)
+
+**理由**: 既存のorganize機能を拡張するだけで大幅な自動化が可能。
+
+- [ ] 14. 既存organize機能の大幅拡張
+    - [ ] 14.1 重複ノート検出・統合システム
+        - 既存のContentAnalysisServiceに類似度計算機能を追加
+        - ファイル名・タイトル・内容の類似度ベース重複検出
+        - 統合提案・プレビュー機能
+        - **依存関係**: なし（既存の文字列処理拡張）
+        - _Requirements: 20.2_
+        - _既存コード拡張: ContentAnalysisService.py 約60行追加_
+
+    - [ ] 14.2 孤立ノート自動接続システム
+        - 既存のLinkAnalysisServiceに孤立ノート検出機能追加
+        - タグ・キーワードベースの関連ノート提案
+        - 自動WikiLink作成提案
+        - **依存関係**: なし（既存機能の組み合わせ）
+        - _Requirements: 20.4_
+        - _既存コード拡張: LinkAnalysisService.py 約40行追加_
+
+    - [ ] 14.3 maintainコマンドの実装
+        - 既存のorganizeコマンドを拡張してmaintain機能追加
+        - 包括的メンテナンスレポート
+        - スケジュール実行対応
+        - **依存関係**: なし（既存CLI拡張）
+        - _Requirements: 20.7_
+        - _既存コード拡張: organize_command.py 約50行追加_
+
+## Phase 15: ollama/LLM活用セマンティック分析 (長期・軽量)
+
+**理由**: ollama + local LLMを活用することで、重い依存関係なしでセマンティック分析が可能。
+
+- [ ] 15. ollama統合セマンティック分析サービス
+    - [ ] 15.1 ollama連携基盤の構築
+        - OllamaServiceクラス新規作成（HTTP API経由）
+        - 軽量なembedding生成（ollama/nomic-embed-text使用）
+        - シンプルなキャッシュシステム（JSON/pickle）
+        - **依存関係**: requests（既存）のみ
+        - _Requirements: 13.1, 13.2_
+        - _既存コード拡張: 新規サービス約100行_
+
+    - [ ] 15.2 LLMベースコンテンツ分析
+        - ollama/llama3.2:3bを使った関連性分析
+        - プロンプトベースの類似ノート発見
+        - 自然言語での関係性説明生成
+        - **依存関係**: ollama（ローカルインストール）
+        - _Requirements: 18.1, 18.2, 21.1_
+        - _既存コード拡張: 新規分析サービス約80行_
+
+    - [ ] 15.3 セマンティック機能のCLI統合
+        - auto-linkコマンドに--semantic-modeオプション追加
+        - discover-relationshipsコマンド実装
+        - LLM分析結果の可視化
+        - **依存関係**: なし（上記サービス活用）
+        - _Requirements: 13.3, 18.7, 21.7_
+        - _既存コード拡張: CLI約60行追加_
+
+## Phase 16: 自動メンテナンスシステム (長期)
+
+- [ ] 17. 継続的メンテナンスシステムの実装
+    - [ ] 17.1 自動メンテナンスエンジン
+        - MaintenanceEngineクラス新規作成
+        - 壊れた参照の自動検出・修正
+        - 重複ノート検出・統合提案
+        - 既存のorganizeコマンドとの統合
+        - _Requirements: 20.1, 20.2_
+        - _既存コード拡張: organize_command.py大幅拡張_
+
+    - [ ] 17.2 構造最適化機能
+        - タグ統合・階層メンテナンス
+        - 孤立ノート検出・接続提案
+        - ファイル組織改善推奨
+        - 既存のContentAnalysisServiceとの統合
+        - _Requirements: 20.3, 20.4, 20.6_
+        - _既存コード拡張: ContentAnalysisService拡張_
+
+    - [ ] 17.3 メンテナンスCLIコマンド
+        - maintainコマンド実装
+        - 包括的メンテナンスレポート
+        - スケジュール実行対応（設定可能間隔）
+        - _Requirements: 20.7, 20.5_
+        - _既存コード拡張: 新規CLIコマンド_
+
+## Phase 17: 高度コンテキスト理解 (長期・高度)
+
+- [ ] 18. コンテキスト理解システムの実装
+    - [ ] 18.1 高度コンテキスト分析システム
+        - SemanticAnalysisServiceの高度コンテキスト評価機能
+        - ドメイン固有コンテキスト認識（プログラミング vs 料理）
+        - 複数段落コンテキスト分析（精度向上）
+        - _Requirements: 21.1, 21.5_
+        - _既存コード拡張: SemanticAnalysisService大幅拡張_
+
+    - [ ] 18.2 インテリジェント曖昧性解消
+        - コンテキスト関連性による高度候補ランキング
+        - 曖昧ケース用の曖昧性解消UI
+        - リンク作成決定の詳細推論レポート
+        - _Requirements: 21.2, 21.3, 21.7_
+        - _既存コード拡張: AutoLinkGenerationUseCase高度化_
+
+    - [ ] 18.3 全機能へのコンテキスト理解統合
+        - 全auto-link機能のコンテキスト理解対応
+        - コンテキスト認識型信頼度閾値管理
+        - 包括的コンテキスト認識リンク検証
+        - _Requirements: 21.4, 21.6_
+        - _既存コード拡張: 全サービスクラス統合_
+
+## Phase 18: 高度機能統合・最適化 (最終段階)
+
+- [ ] 19. セカンドブレイン自動化オーケストレーター
+    - [ ] 19.1 統合自動化システム
+        - SecondBrainAutomationOrchestratorクラス実装
+        - 全機能の統合実行ワークフロー
+        - 自動化レベル設定（CONSERVATIVE/AGGRESSIVE）
+        - 包括的自動化レポート生成
+        - _Requirements: 17.7, 18.7, 20.7_
+        - _既存コード拡張: 新規オーケストレーター + 全サービス統合_
+
+    - [ ] 19.2 パフォーマンス最適化
+        - 埋め込みキャッシュ最適化
+        - バッチ処理・並列処理実装
+        - メモリ効率化・ストリーミング処理
+        - 大規模vault対応
+        - _既存コード拡張: 全サービスのパフォーマンス改善_
+
+    - [ ] 19.3 統合CLIコマンド
+        - full-automationコマンド実装
+        - 設定可能自動化レベル
+        - 包括的品質メトリクス
+        - スケジュール実行対応
+        - _既存コード拡張: 新規統合CLIコマンド_
 
 ## Benefits of This Approach
 
