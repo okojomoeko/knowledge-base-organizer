@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -74,9 +75,146 @@ class TagPatternManager:
         self.categories: dict[str, TagPatternCategory] = {}
         self.vault_analysis: VaultTagAnalysis | None = None
 
+        # Initialize Japanese variation patterns from external file
+        self.japanese_variations = self._load_japanese_variation_patterns()
+        self.japanese_variations_file = self.config_dir / "japanese_variations.yaml"
+
         # Load existing patterns and analysis
         self._load_patterns()
         self._load_vault_analysis()
+
+    def _load_japanese_variation_patterns(self) -> dict[str, Any]:
+        """Load Japanese katakana variation patterns from external YAML file."""
+        # Try to load from user's config directory first
+        user_variations_file = self.config_dir / "japanese_variations.yaml"
+
+        # If user file doesn't exist, copy from default and load
+        if not user_variations_file.exists():
+            self._create_default_japanese_variations_file(user_variations_file)
+
+        try:
+            with user_variations_file.open(encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+
+            # Convert YAML structure to internal format for backward compatibility
+            return self._convert_yaml_to_internal_format(data)
+
+        except Exception as e:
+            print(
+                f"Warning: Failed to load Japanese variations from {user_variations_file}: {e}"
+            )
+            # Fallback to minimal hardcoded patterns
+            return self._get_fallback_patterns()
+
+    def _create_default_japanese_variations_file(self, target_path: Path) -> None:
+        """Create default Japanese variations file from bundled template."""
+        # Get the default file from the package
+        default_file = (
+            Path(__file__).parent.parent.parent / "config" / "japanese_variations.yaml"
+        )
+
+        if default_file.exists():
+            import shutil
+
+            shutil.copy2(default_file, target_path)
+            print(f"Created default Japanese variations file at: {target_path}")
+        else:
+            # Create minimal file if template is missing
+            minimal_data = {
+                "metadata": {
+                    "version": "1.0.0",
+                    "description": "Japanese variation patterns",
+                    "last_updated": datetime.now().isoformat(),
+                },
+                "long_vowel_patterns": {"ー": ["", "ウ", "ー"], "ウ": ["ー", "", "ウ"]},
+                "consonant_patterns": {"ヴ": ["ブ", "バ"], "ティ": ["テ"]},
+                "english_japanese_pairs": {
+                    "API": {"japanese": ["エーピーアイ"], "aliases": ["api"]}
+                },
+            }
+
+            with target_path.open("w", encoding="utf-8") as f:
+                yaml.dump(minimal_data, f, allow_unicode=True, default_flow_style=False)
+
+    def _convert_yaml_to_internal_format(
+        self, yaml_data: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Convert YAML structure to internal format for backward compatibility."""
+        result = {
+            "long_vowel_patterns": yaml_data.get("long_vowel_patterns", {}),
+            "consonant_patterns": yaml_data.get("consonant_patterns", {}),
+            "english_japanese_pairs": {},
+        }
+
+        # Convert english_japanese_pairs format
+        for english, data in yaml_data.get("english_japanese_pairs", {}).items():
+            if isinstance(data, dict):
+                japanese_terms = data.get("japanese", [])
+                aliases = data.get("aliases", [])
+                result["english_japanese_pairs"][english] = japanese_terms + aliases
+            else:
+                # Fallback for old format
+                result["english_japanese_pairs"][english] = data
+
+        return result
+
+    def _get_fallback_patterns(self) -> dict[str, Any]:
+        """Get minimal fallback patterns if YAML loading fails."""
+        return {
+            "long_vowel_patterns": {
+                "ー": ["", "ウ", "ー"],
+                "ウ": ["ー", "", "ウ"],
+            },
+            "consonant_patterns": {
+                "ヴ": ["ブ", "バ"],
+                "ティ": ["テ"],
+            },
+            "english_japanese_pairs": {
+                "API": ["エーピーアイ", "api"],
+                "DB": ["データベース", "db"],
+            },
+        }
+
+    def find_japanese_variations(self, text: str) -> list[str]:
+        """Find Japanese katakana variations of the given text."""
+        variations = [text]
+
+        # Apply long vowel variations
+        for original, replacements in self.japanese_variations[
+            "long_vowel_patterns"
+        ].items():
+            for replacement in replacements:
+                if original in text:
+                    variation = text.replace(original, replacement)
+                    if variation != text and variation not in variations:
+                        variations.append(variation)
+
+        # Apply consonant variations
+        for original, replacements in self.japanese_variations[
+            "consonant_patterns"
+        ].items():
+            for replacement in replacements:
+                if original in text:
+                    variation = text.replace(original, replacement)
+                    if variation != text and variation not in variations:
+                        variations.append(variation)
+
+        # Check for English-Japanese pairs
+        text_upper = text.upper()
+        if text_upper in self.japanese_variations["english_japanese_pairs"]:
+            variations.extend(
+                self.japanese_variations["english_japanese_pairs"][text_upper]
+            )
+
+        # Reverse lookup for Japanese to English
+        for english, japanese_list in self.japanese_variations[
+            "english_japanese_pairs"
+        ].items():
+            if text in japanese_list:
+                variations.append(english.lower())
+                variations.append(english.upper())
+
+        return list(set(variations))  # Remove duplicates
 
     def _load_patterns(self) -> None:
         """Load tag patterns from file."""
@@ -341,6 +479,42 @@ class TagPatternManager:
                 description="Japanese culture content",
                 confidence_weight=1.0,
             ),
+            "api": TagPattern(
+                tag_name="api",
+                keywords=[
+                    "api",
+                    "エーピーアイ",
+                    "インターフェース",
+                    "インターフェイス",
+                    "interface",
+                ],
+                category="japanese_content",
+                description="API and interface related content",
+                confidence_weight=1.2,
+            ),
+            "database": TagPattern(
+                tag_name="database",
+                keywords=[
+                    "データベース",
+                    "db",
+                    "database",
+                    "ディービー",
+                ],
+                category="japanese_content",
+                description="Database related content",
+                confidence_weight=1.2,
+            ),
+            "service": TagPattern(
+                tag_name="service",
+                keywords=[
+                    "サービス",
+                    "サーヴィス",
+                    "service",
+                ],
+                category="japanese_content",
+                description="Service related content",
+                confidence_weight=1.1,
+            ),
         }
 
         for name, pattern in japanese_patterns.items():
@@ -350,6 +524,90 @@ class TagPatternManager:
 
         # Save default patterns
         self.save_patterns()
+
+    def reload_japanese_variations(self) -> bool:
+        """Reload Japanese variation patterns from file."""
+        try:
+            self.japanese_variations = self._load_japanese_variation_patterns()
+            return True
+        except Exception as e:
+            print(f"Failed to reload Japanese variations: {e}")
+            return False
+
+    def add_japanese_variation(
+        self, category: str, original: str, variations: list[str]
+    ) -> bool:
+        """Add a new Japanese variation pattern."""
+        user_variations_file = self.config_dir / "japanese_variations.yaml"
+
+        try:
+            # Load current data
+            if user_variations_file.exists():
+                with user_variations_file.open(encoding="utf-8") as f:
+                    data = yaml.safe_load(f) or {}
+            else:
+                data = {"metadata": {"version": "1.0.0"}}
+
+            # Add new pattern
+            if category not in data:
+                data[category] = {}
+
+            data[category][original] = variations
+            data["metadata"]["last_updated"] = datetime.now().isoformat()
+
+            # Save updated data
+            with user_variations_file.open("w", encoding="utf-8") as f:
+                yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
+
+            # Reload patterns
+            self.reload_japanese_variations()
+            return True
+
+        except Exception as e:
+            print(f"Failed to add Japanese variation: {e}")
+            return False
+
+    def export_japanese_variations(self, export_path: Path) -> bool:
+        """Export current Japanese variations to a file."""
+        try:
+            user_variations_file = self.config_dir / "japanese_variations.yaml"
+            if user_variations_file.exists():
+                import shutil
+
+                shutil.copy2(user_variations_file, export_path)
+                return True
+            return False
+        except Exception as e:
+            print(f"Failed to export Japanese variations: {e}")
+            return False
+
+    def import_japanese_variations(self, import_path: Path) -> bool:
+        """Import Japanese variations from a file."""
+        try:
+            if not import_path.exists():
+                return False
+
+            # Validate the imported file
+            with import_path.open(encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+
+            # Basic validation
+            if not isinstance(data, dict):
+                return False
+
+            # Copy to user config
+            user_variations_file = self.config_dir / "japanese_variations.yaml"
+            import shutil
+
+            shutil.copy2(import_path, user_variations_file)
+
+            # Reload patterns
+            self.reload_japanese_variations()
+            return True
+
+        except Exception as e:
+            print(f"Failed to import Japanese variations: {e}")
+            return False
 
     def add_pattern(
         self,
@@ -443,7 +701,7 @@ class TagPatternManager:
         return results
 
     def suggest_tags_for_content(self, content: str) -> list[tuple[str, float]]:
-        """Suggest tags for content based on patterns."""
+        """Suggest tags for content with Japanese variation support."""
         content_lower = content.lower()
         suggestions = []
 
@@ -451,9 +709,19 @@ class TagPatternManager:
             self.categories.values(), key=lambda c: c.priority, reverse=True
         ):
             for pattern in category.patterns.values():
-                keyword_matches = sum(
-                    1 for keyword in pattern.keywords if keyword in content_lower
-                )
+                keyword_matches = 0
+
+                # Check direct keyword matches
+                for keyword in pattern.keywords:
+                    if keyword in content_lower:
+                        keyword_matches += 1
+                    else:
+                        # Check Japanese variations
+                        variations = self.find_japanese_variations(keyword)
+                        for variation in variations:
+                            if variation.lower() in content_lower:
+                                keyword_matches += 1
+                                break  # Count each keyword only once
 
                 if keyword_matches > 0:
                     # Calculate confidence score
