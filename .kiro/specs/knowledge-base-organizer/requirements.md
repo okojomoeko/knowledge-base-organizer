@@ -14,18 +14,21 @@ The application prioritizes frontmatter standardization, intelligent WikiLink ge
 
 - Requirements 1-12: 基本機能群（frontmatter検証、auto-link、dead link検出等）
 
-**🚀 最優先実装 (Phase 12 - 即座に着手可能)**
+**🚀 最優先実装 (Phase 12-13 - 健全性とノイズ除去)**
 
 - Requirements 19: 日本語処理強化（既存コード拡張、軽量実装）
+- Requirements 20: 自動メンテナンスシステム（重複除去・孤立ノート接続）
 
-**🔶 中優先実装 (Phase 13-14)**
+**🔶 中優先実装 (Phase 14-15 - 基盤強化)**
 
 - Requirements 17: インテリジェントfrontmatter強化（既存サービス拡張）
-- Requirements 20: 自動メンテナンスシステム（既存organize機能拡張）
+- Requirements 13-16: セマンティック分析基盤（ollama + local LLM使用）
 
-**⏳ 長期実装 (Phase 15-17 - ollama/LLM活用)**
+**⏳ 長期実装 (Phase 16-18 - 創発と高度AI活用)**
 
-- Requirements 13-16: セマンティック分析（ollama + local LLM使用）
+- Requirements 22: MOC構築支援（LYT思想の実現）
+- Requirements 23: コンセプトベース自動タグ付け（AI合成・推論）
+- Requirements 24: 論理的関係性明示（AI推論活用）
 - Requirements 18: 関係性発見システム（LLM活用）
 - Requirements 21: 高度コンテキスト理解（LLM活用）
 
@@ -311,3 +314,45 @@ The application prioritizes frontmatter standardization, intelligent WikiLink ge
 5. WHEN processing technical content, THEN the system SHALL maintain domain-specific context awareness (e.g., programming vs. cooking)
 6. WHEN link confidence is below threshold, THEN the system SHALL skip automatic linking and suggest manual review
 7. WHEN context analysis is complete, THEN the system SHALL provide detailed reasoning for link creation decisions
+
+### Requirement 22: MOC (Map of Content) 構築支援
+
+**User Story:** As an LYT practitioner, I want to efficiently construct and maintain MOCs (Maps of Content) that structure related note clusters, so that I can promote emergence and deeper understanding through organized knowledge structures.
+
+#### Acceptance Criteria
+
+1. WHEN analyzing the vault, THEN the system SHALL identify densely connected note clusters that lack MOC organization
+2. WHEN MOC candidates are found, THEN the system SHALL propose MOC creation with suggested titles and initial structure
+3. WHEN a user specifies a theme, THEN the system SHALL perform semantic search and generate MOC draft files with relevant notes
+4. WHEN analyzing existing MOCs, THEN the system SHALL identify contextually isolated notes that should be linked to the MOC
+5. WHEN MOC recommendations are made, THEN the system SHALL provide clustering rationale and relationship explanations
+6. WHEN generating MOC drafts, THEN the system SHALL organize notes by logical relationships (premise, example, detail, contradiction)
+7. WHEN MOC maintenance is performed, THEN the system SHALL suggest structural improvements and missing connections
+
+### Requirement 23: コンセプトベースの自動タグ付け・エイリアス生成
+
+**User Story:** As a note-taker, I want AI to extract core concepts from my note content and automatically generate appropriate tags and aliases, so that my notes are properly categorized without manual effort.
+
+#### Acceptance Criteria
+
+1. WHEN processing note content, THEN the system SHALL use LLM analysis to extract 3-5 core concepts as keywords
+2. WHEN core concepts are extracted, THEN the system SHALL normalize them against existing tags and aliases in the vault
+3. WHEN concept normalization is complete, THEN the system SHALL resolve synonyms (e.g., "AI" and "人工知能") into consistent terminology
+4. WHEN generating tags, THEN the system SHALL respect existing tag hierarchies and suggest appropriate parent-child relationships
+5. WHEN creating aliases, THEN the system SHALL ensure bidirectional discoverability between concept variations
+6. WHEN concept extraction is uncertain, THEN the system SHALL provide confidence scores and allow user review
+7. WHEN frontmatter updates are applied, THEN the system SHALL preserve existing valid metadata while adding enhancements
+
+### Requirement 24: ノート間の論理的関係性の明示
+
+**User Story:** As a knowledge worker, I want to understand not just that two notes are related, but how they are logically connected (premise, example, contradiction, etc.), so that I can build more coherent knowledge structures.
+
+#### Acceptance Criteria
+
+1. WHEN analyzing note relationships, THEN the system SHALL identify logical relationship types (PREMISE, EXAMPLE, CONTRADICTION, DETAIL, ELABORATION)
+2. WHEN relationship types are determined, THEN the system SHALL provide natural language explanations for each connection
+3. WHEN displaying relationships, THEN the system SHALL use structured formats like "[[Note A]] is a premise for [[Note B]]"
+4. WHEN building MOCs, THEN the system SHALL organize notes according to their logical relationships
+5. WHEN generating reports, THEN the system SHALL highlight contradictions and knowledge gaps in the relationship network
+6. WHEN relationship confidence is low, THEN the system SHALL mark uncertain connections for user verification
+7. WHEN logical relationships are established, THEN the system SHALL suggest additional notes that could strengthen the argument chain

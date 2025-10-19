@@ -55,12 +55,23 @@ classDiagram
         +file_id: str
         +frontmatter: Frontmatter
         +content: str
+        +note_type: Optional[NoteType]
         +wiki_links: List[WikiLink]
         +regular_links: List[RegularLink]
         +link_reference_definitions: List[LinkRefDef]
         +extract_links()
         +validate_frontmatter(schema)
         +add_wiki_link(target_id, alias)
+        +detect_note_type()
+    }
+
+    class NoteType {
+        +name: str
+        +schema: FrontmatterSchema
+        +directory_patterns: List[str]
+        +content_indicators: List[str]
+        +linking_preferences: LinkingPreferences
+        +matches_file(file: MarkdownFile): bool
     }
 
     class Frontmatter {
@@ -1645,3 +1656,258 @@ dependencies = [
 5. **コスト効率**: 外部API不要
 
 この修正されたアプローチにより、既存の安定した機能を保持しながら、軽量で実用的なAI機能を段階的に追加できます。
+
+## 🎯 LYT思想とMOC構築支援アーキテクチャ
+
+### MOC Generation Use Case
+
+**MOC (Map of Content) 構築の自動化:**
+
+```python
+class MocGenerationUseCase:
+    def __init__(
+        self,
+        relationship_service: RelationshipDiscoveryService,
+        ollama_service: OllamaSemanticService,
+        file_repository: FileRepository
+    ):
+        self.relationship_service = relationship_service
+        self.ollama_service = ollama_service
+        self.file_repository = file_repository
+
+    def generate_moc_for_theme(
+        self,
+        theme: str,
+        vault_files: List[MarkdownFile]
+    ) -> MocDraft:
+        """テーマに基づくMOCドラフト生成"""
+
+        # 1. テーマ関連ノートのセマンティック検索
+        relevant_notes = self._find_theme_related_notes(theme, vault_files)
+
+        # 2. ノート間の論理的関係性分析
+        relationships = self._analyze_logical_relationships(relevant_notes)
+
+        # 3. 構造化されたMOCドラフト生成
+        moc_structure = self._organize_by_logical_relationships(
+            relevant_notes, relationships
+        )
+
+        # 4. MOCマークダウンファイル生成
+        return self._generate_moc_markdown(theme, moc_structure)
+
+    def _analyze_logical_relationships(
+        self,
+        notes: List[MarkdownFile]
+    ) -> List[LogicalRelationship]:
+        """ollama活用による論理的関係性分析"""
+        relationships = []
+
+        for note_a in notes:
+            for note_b in notes:
+                if note_a != note_b:
+                    # LLMで関係性タイプを分析
+                    relationship = self.ollama_service.analyze_logical_relationship(
+                        note_a.content, note_b.content
+                    )
+                    if relationship.confidence > 0.7:
+                        relationships.append(relationship)
+
+        return relationships
+
+    def _organize_by_logical_relationships(
+        self,
+        notes: List[MarkdownFile],
+        relationships: List[LogicalRelationship]
+    ) -> MocStructure:
+        """論理的関係性に基づくMOC構造化"""
+
+        # PREMISE → DETAIL → EXAMPLE の順序で構造化
+        premises = [n for n in notes if self._is_premise_note(n, relationships)]
+        details = [n for n in notes if self._is_detail_note(n, relationships)]
+        examples = [n for n in notes if self._is_example_note(n, relationships)]
+
+        return MocStructure(
+            premises=premises,
+            details=details,
+            examples=examples,
+            contradictions=self._find_contradictions(relationships)
+        )
+```
+
+### Enhanced Ollama Service for AI Synthesis
+
+**「分析」から「合成・推論」への拡張:**
+
+```python
+class EnhancedOllamaService:
+    def __init__(self, base_url: str = "http://localhost:11434"):
+        self.base_url = base_url
+        self.embedding_model = "nomic-embed-text"
+        self.reasoning_model = "llama3.2:3b"
+
+    def extract_core_concepts(self, content: str) -> ConceptExtractionResult:
+        """コンセプトベース自動タグ付け"""
+        prompt = f"""
+        以下のノート内容から、中核となる概念を3-5個のキーワードで抽出してください。
+        各概念に対して信頼度スコア（0-1）も提供してください。
+
+        ノート内容:
+        {content[:1000]}...
+
+        出力形式:
+        概念1 (信頼度: 0.9)
+        概念2 (信頼度: 0.8)
+        ...
+        """
+
+        response = self._call_llm(prompt)
+        return self._parse_concept_extraction(response)
+
+    def analyze_logical_relationship(
+        self,
+        content_a: str,
+        content_b: str
+    ) -> LogicalRelationship:
+        """論理的関係性の分析"""
+        prompt = f"""
+        以下の2つのノートの論理的関係性を分析してください。
+        関係性タイプ: PREMISE, DETAIL, EXAMPLE, CONTRADICTION, ELABORATION, NONE
+
+        ノートA: {content_a[:300]}...
+        ノートB: {content_b[:300]}...
+
+        出力形式:
+        関係性タイプ: [タイプ]
+        信頼度: [0-1]
+        説明: [自然言語での説明]
+        """
+
+        response = self._call_llm(prompt)
+        return self._parse_logical_relationship(response)
+
+    def suggest_moc_structure(
+        self,
+        theme: str,
+        notes: List[str]
+    ) -> MocStructureSuggestion:
+        """MOC構造の提案"""
+        notes_summary = "\n".join([f"- {note[:100]}..." for note in notes])
+
+        prompt = f"""
+        テーマ「{theme}」に関する以下のノート群を、論理的な構造で整理してください。
+
+        ノート一覧:
+        {notes_summary}
+
+        以下の構造で整理してください:
+        1. 前提・基礎概念 (PREMISE)
+        2. 詳細・展開 (DETAIL)
+        3. 具体例・応用 (EXAMPLE)
+        4. 矛盾・課題 (CONTRADICTION)
+
+        各セクションにノートを分類し、理由も説明してください。
+        """
+
+        response = self._call_llm(prompt)
+        return self._parse_moc_structure(response)
+```
+
+### NoteType Domain Model
+
+**ノートタイプの明示的導入:**
+
+```python
+@dataclass
+class NoteType:
+    """ノートタイプを表すValue Object"""
+    name: str  # "FleetingNote", "BookNote", "MOC", "EvergreenNote"
+    schema: FrontmatterSchema
+    directory_patterns: List[str]  # ["100_FleetingNotes/**", "104_Books/**"]
+    content_indicators: List[str]  # ["isbn13", "author"] for BookNote
+    linking_preferences: LinkingPreferences
+
+    def matches_file(self, file: MarkdownFile) -> bool:
+        """ファイルがこのノートタイプに適合するかチェック"""
+        # ディレクトリパターンチェック
+        if self._matches_directory_pattern(file.path):
+            return True
+
+        # コンテンツ指標チェック
+        if self._matches_content_indicators(file.frontmatter):
+            return True
+
+        return False
+
+@dataclass
+class LinkingPreferences:
+    """ノートタイプ固有のリンク設定"""
+    preferred_targets: List[str]  # ["EvergreenNote", "MOC"]
+    avoid_targets: List[str]      # ["FleetingNote"]
+    max_outgoing_links: int = 50
+    require_bidirectional: bool = True
+
+class EnhancedTemplateSchemaRepository:
+    """NoteType検出機能付きテンプレートリポジトリ"""
+
+    def __init__(self, vault_path: Path, config: ProcessingConfig):
+        self.vault_path = vault_path
+        self.config = config
+        self.note_types = self._load_note_types()
+
+    def detect_note_type(self, file: MarkdownFile) -> Optional[NoteType]:
+        """ファイルのノートタイプを検出"""
+        for note_type in self.note_types:
+            if note_type.matches_file(file):
+                return note_type
+        return None
+
+    def _load_note_types(self) -> List[NoteType]:
+        """設定からノートタイプを読み込み"""
+        return [
+            NoteType(
+                name="FleetingNote",
+                schema=self._extract_schema("new-fleeing-note.md"),
+                directory_patterns=["100_FleetingNotes/**"],
+                content_indicators=["published", "category"],
+                linking_preferences=LinkingPreferences(
+                    preferred_targets=["EvergreenNote", "MOC"],
+                    avoid_targets=[],
+                    max_outgoing_links=10
+                )
+            ),
+            NoteType(
+                name="BookNote",
+                schema=self._extract_schema("booksearchtemplate.md"),
+                directory_patterns=["104_Books/**"],
+                content_indicators=["isbn13", "author", "publisher"],
+                linking_preferences=LinkingPreferences(
+                    preferred_targets=["MOC", "ConceptNote"],
+                    avoid_targets=["FleetingNote"],
+                    max_outgoing_links=20
+                )
+            ),
+            NoteType(
+                name="MOC",
+                schema=self._create_moc_schema(),
+                directory_patterns=["MOCs/**", "**/*MOC*.md"],
+                content_indicators=["moc_type", "cluster_theme"],
+                linking_preferences=LinkingPreferences(
+                    preferred_targets=["EvergreenNote", "ConceptNote"],
+                    avoid_targets=[],
+                    max_outgoing_links=100,
+                    require_bidirectional=False
+                )
+            )
+        ]
+```
+
+### 実装の利点
+
+1. **創発促進**: MOC構築支援により知識の構造化と深い理解を促進
+2. **AI合成・推論**: 単純な類似度分析から論理的関係性分析へ進化
+3. **健全性重視**: 重複・孤立ノート除去を最優先として思考の整理を支援
+4. **型安全性**: NoteType導入により動的な振る舞い制御が可能
+5. **LYT思想実現**: Map of Content の自動構築・維持により真の Second Brain を実現
+
+この強化されたアーキテクチャにより、単なる「ノート管理ツール」から「思考支援・創発促進システム」へと進化します。
