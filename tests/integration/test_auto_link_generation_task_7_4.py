@@ -56,7 +56,7 @@ class TestAutoLinkGenerationTask74:
     def auto_link_use_case(self, config):
         """Auto-link generation use case with dependencies."""
         file_repository = FileRepository(config)
-        link_analysis_service = LinkAnalysisService()
+        link_analysis_service = LinkAnalysisService(config_dir=None)
         content_processing_service = ContentProcessingService()
 
         return AutoLinkGenerationUseCase(

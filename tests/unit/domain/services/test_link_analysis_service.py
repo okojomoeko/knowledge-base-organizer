@@ -24,12 +24,12 @@ class TestLinkAnalysisService:
     @pytest.fixture
     def service(self):
         """Create a LinkAnalysisService instance."""
-        return LinkAnalysisService()
+        return LinkAnalysisService(config_dir=None)
 
     @pytest.fixture
     def service_exclude_tables(self):
         """Create a LinkAnalysisService instance that excludes tables."""
-        return LinkAnalysisService(exclude_tables=True)
+        return LinkAnalysisService(exclude_tables=True, config_dir=None)
 
     @pytest.fixture
     def sample_content(self):

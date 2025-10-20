@@ -28,7 +28,7 @@ class TestDeadLinkDetectionEndToEnd:
         """Create a dead link detection use case with real dependencies."""
         config = ProcessingConfig.get_default_config()
         file_repository = FileRepository(config)
-        link_analysis_service = LinkAnalysisService()
+        link_analysis_service = LinkAnalysisService(config_dir=None)
 
         return DeadLinkDetectionUseCase(
             file_repository=file_repository,

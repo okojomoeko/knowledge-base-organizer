@@ -1,10 +1,30 @@
 """Link analysis service for detecting and analyzing links in markdown content."""
 
 import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
 from ..models import MarkdownFile, TextPosition, TextRange
+from .tag_pattern_manager import TagPatternManager
+
+
+@dataclass
+class CodeBlockState:
+    """State for tracking code block boundaries."""
+
+    in_code_block: bool = False
+    start_line: int = 0
+
+
+@dataclass
+class FrontmatterState:
+    """State for tracking frontmatter boundaries."""
+
+    start_line: int | None = None
+    in_frontmatter: bool = False
 
 
 class LinkCandidate(BaseModel):
@@ -20,6 +40,7 @@ class LinkCandidate(BaseModel):
     suggested_alias: str | None
     position: TextPosition
     confidence: float = 1.0
+    variation_type: str | None = None  # "katakana_variation", "english_japanese", etc.
 
 
 class DeadLink(BaseModel):
@@ -58,13 +79,17 @@ class LinkDensityMetrics(BaseModel):
 class LinkAnalysisService:
     """Service for analyzing and processing links in markdown content."""
 
-    def __init__(self, exclude_tables: bool = False):
+    def __init__(self, exclude_tables: bool = False, config_dir: Path | None = None):
         """Initialize the link analysis service.
 
         Args:
             exclude_tables: Whether to exclude table content from link processing
+            config_dir: Configuration directory for Japanese processing patterns
         """
         self.exclude_tables = exclude_tables
+        # Initialize Japanese processing capabilities
+        self.tag_pattern_manager = TagPatternManager(config_dir)
+        self.japanese_enabled = True
 
     def extract_exclusion_zones(self, content: str) -> list[TextRange]:
         """Extract areas where auto-linking should be avoided.
@@ -88,183 +113,179 @@ class LinkAnalysisService:
         """
         exclusion_zones = []
         lines = content.split("\n")
-
-        # Pre-compile regex patterns for efficiency
-        html_a_tag_pattern = re.compile(r"<a[^>]*>.*?</a>")
-        inline_code_pattern = re.compile(r"`.*?`")
-        wiki_pattern = re.compile(r"\[\[([^\]]+)\]\]")
-        regular_link_pattern = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
-        link_ref_pattern = re.compile(
-            r"^\[([^|\]]+)\|([^\]]+)\]:\s*([^\s]+)(?:\s+\"([^\"]+)\")?"
-        )
-        url_pattern = re.compile(r"https?://[^\s)]+")
-        template_patterns = [
-            re.compile(r"\$\{[^}]*\}"),  # ${variable}
-            re.compile(r"\{\{[^}]*\}\}"),  # {{variable}}
-            re.compile(r"<%[^%]*%>"),  # <% template %>
-            re.compile(r"<%\*[^*]*\*%>"),  # <%* template *%>
-        ]
+        patterns = self._compile_exclusion_patterns()
 
         # Track frontmatter and code block boundaries
-        frontmatter_start = None
-        in_frontmatter = False
-        in_code_block = False
-        code_block_start_line = 0
+        code_state = CodeBlockState()
+        frontmatter_state = FrontmatterState()
 
         for line_num, line in enumerate(lines, 1):
-            # Detect fenced code blocks
-            if line.strip().startswith("```"):
-                if not in_code_block:
-                    in_code_block = True
-                    code_block_start_line = line_num
-                else:
-                    in_code_block = False
-                    exclusion_zones.append(
-                        TextRange(
-                            start_line=code_block_start_line,
-                            start_column=0,
-                            end_line=line_num,
-                            end_column=len(line),
-                            zone_type="code_block",
-                        )
-                    )
+            # Handle code blocks
+            if self._handle_code_blocks(line, line_num, code_state, exclusion_zones):
+                self._update_code_block_state(line, line_num, code_state)
                 continue
 
-            if in_code_block:
+            if code_state.in_code_block:
                 continue
 
-            # Detect frontmatter boundaries
-            if line.strip() == "---":
-                if frontmatter_start is None:
-                    frontmatter_start = line_num
-                    in_frontmatter = True
-                elif in_frontmatter:
-                    in_frontmatter = False
-                    # Add frontmatter exclusion zone
-                    exclusion_zones.append(
-                        TextRange(
-                            start_line=frontmatter_start,
-                            start_column=0,
-                            end_line=line_num,
-                            end_column=len(line),
-                            zone_type="frontmatter",
-                        )
-                    )
-
+            # Handle frontmatter
+            self._handle_frontmatter(line, line_num, frontmatter_state, exclusion_zones)
             # Skip processing if we're in frontmatter
-            if in_frontmatter:
+            if frontmatter_state.in_frontmatter:
                 continue
 
-            # Detect H1 headers: # ...
-            if line.strip().startswith("# "):
-                exclusion_zones.append(
-                    TextRange(
-                        start_line=line_num,
-                        start_column=0,
-                        end_line=line_num,
-                        end_column=len(line),
-                        zone_type="h1_header",
-                    )
-                )
-
-            # Detect URLs
-            for match in url_pattern.finditer(line):
-                exclusion_zones.append(
-                    TextRange(
-                        start_line=line_num,
-                        start_column=match.start(),
-                        end_line=line_num,
-                        end_column=match.end(),
-                        zone_type="url",
-                    )
-                )
-
-            # Detect HTML 'a' tags: <a...>...</a>
-            for match in html_a_tag_pattern.finditer(line):
-                exclusion_zones.append(
-                    TextRange(
-                        start_line=line_num,
-                        start_column=match.start(),
-                        end_line=line_num,
-                        end_column=match.end(),
-                        zone_type="html_tag",
-                    )
-                )
-
-            # Detect inline code blocks: `...`
-            for match in inline_code_pattern.finditer(line):
-                exclusion_zones.append(
-                    TextRange(
-                        start_line=line_num,
-                        start_column=match.start(),
-                        end_line=line_num,
-                        end_column=match.end(),
-                        zone_type="inline_code",
-                    )
-                )
-
-            # Detect WikiLinks: [[...]]
-            for match in wiki_pattern.finditer(line):
-                exclusion_zones.append(
-                    TextRange(
-                        start_line=line_num,
-                        start_column=match.start(),
-                        end_line=line_num,
-                        end_column=match.end(),
-                        zone_type="wikilink",
-                    )
-                )
-
-            # Detect regular markdown links: [text](url)
-            for match in regular_link_pattern.finditer(line):
-                exclusion_zones.append(
-                    TextRange(
-                        start_line=line_num,
-                        start_column=match.start(),
-                        end_line=line_num,
-                        end_column=match.end(),
-                        zone_type="regular_link",
-                    )
-                )
-
-            # Detect Link Reference Definitions: [id|alias]: path "title"
-            if link_ref_pattern.match(line.strip()):
-                exclusion_zones.append(
-                    TextRange(
-                        start_line=line_num,
-                        start_column=0,
-                        end_line=line_num,
-                        end_column=len(line),
-                        zone_type="link_ref_def",
-                    )
-                )
-
-            # Detect table rows (if configured to exclude)
-            if self.exclude_tables and self._is_table_row(line):
-                exclusion_zones.append(
-                    TextRange(
-                        start_line=line_num,
-                        start_column=0,
-                        end_line=line_num,
-                        end_column=len(line),
-                        zone_type="table",
-                    )
-                )
-
-            # Detect template variables and template blocks
-            for pattern in template_patterns:
-                for match in pattern.finditer(line):
-                    exclusion_zones.append(
-                        TextRange(
-                            start_line=line_num,
-                            start_column=match.start(),
-                            end_line=line_num,
-                            end_column=match.end(),
-                            zone_type="template_variable",
-                        )
-                    )
+            # Process line-level exclusions
+            self._process_line_exclusions(line, line_num, patterns, exclusion_zones)
 
         return exclusion_zones
+
+    def _compile_exclusion_patterns(self) -> dict[str, re.Pattern]:
+        """Compile regex patterns for exclusion zone detection."""
+        return {
+            "html_a_tag": re.compile(r"<a[^>]*>.*?</a>"),
+            "inline_code": re.compile(r"`.*?`"),
+            "wiki": re.compile(r"\[\[([^\]]+)\]\]"),
+            "regular_link": re.compile(r"\[([^\]]+)\]\(([^)]+)\)"),
+            "link_ref": re.compile(
+                r"^\[([^|\]]+)\|([^\]]+)\]:\s*([^\s]+)(?:\s+\"([^\"]+)\")?"
+            ),
+            "url": re.compile(r"https?://[^\s)]+"),
+            "template_var": re.compile(r"\$\{[^}]*\}"),
+            "template_block": re.compile(r"\{\{[^}]*\}\}"),
+            "template_asp": re.compile(r"<%[^%]*%>"),
+            "template_asp_comment": re.compile(r"<%\*[^*]*\*%>"),
+        }
+
+    def _handle_code_blocks(
+        self,
+        line: str,
+        line_num: int,
+        code_state: CodeBlockState,
+        exclusion_zones: list[TextRange],
+    ) -> bool:
+        """Handle code block detection and zone creation."""
+        if line.strip().startswith("```"):
+            if not code_state.in_code_block:
+                return True  # Starting code block
+            # Ending code block
+            exclusion_zones.append(
+                TextRange(
+                    start_line=code_state.start_line,
+                    start_column=0,
+                    end_line=line_num,
+                    end_column=len(line),
+                    zone_type="code_block",
+                )
+            )
+            return True
+        return False
+
+    def _update_code_block_state(
+        self, line: str, line_num: int, code_state: CodeBlockState
+    ) -> None:
+        """Update code block state."""
+        if line.strip().startswith("```"):
+            if not code_state.in_code_block:
+                code_state.in_code_block = True
+                code_state.start_line = line_num
+            else:
+                code_state.in_code_block = False
+                code_state.start_line = 0
+
+    def _handle_frontmatter(
+        self,
+        line: str,
+        line_num: int,
+        frontmatter_state: FrontmatterState,
+        exclusion_zones: list[TextRange],
+    ) -> None:
+        """Handle frontmatter detection and zone creation."""
+        if line.strip() == "---":
+            if frontmatter_state.start_line is None:
+                frontmatter_state.start_line = line_num
+                frontmatter_state.in_frontmatter = True
+            elif frontmatter_state.in_frontmatter:
+                # End frontmatter
+                exclusion_zones.append(
+                    TextRange(
+                        start_line=frontmatter_state.start_line,
+                        start_column=0,
+                        end_line=line_num,
+                        end_column=len(line),
+                        zone_type="frontmatter",
+                    )
+                )
+                frontmatter_state.start_line = None
+                frontmatter_state.in_frontmatter = False
+
+    def _process_line_exclusions(
+        self,
+        line: str,
+        line_num: int,
+        patterns: dict[str, re.Pattern],
+        exclusion_zones: list[TextRange],
+    ) -> None:
+        """Process line-level exclusion patterns."""
+        # H1 headers
+        if line.strip().startswith("# "):
+            exclusion_zones.append(
+                TextRange(
+                    start_line=line_num,
+                    start_column=0,
+                    end_line=line_num,
+                    end_column=len(line),
+                    zone_type="h1_header",
+                )
+            )
+
+        # Link Reference Definitions
+        if patterns["link_ref"].match(line.strip()):
+            exclusion_zones.append(
+                TextRange(
+                    start_line=line_num,
+                    start_column=0,
+                    end_line=line_num,
+                    end_column=len(line),
+                    zone_type="link_ref_def",
+                )
+            )
+
+        # Table rows
+        if self.exclude_tables and self._is_table_row(line):
+            exclusion_zones.append(
+                TextRange(
+                    start_line=line_num,
+                    start_column=0,
+                    end_line=line_num,
+                    end_column=len(line),
+                    zone_type="table",
+                )
+            )
+
+        # Pattern-based exclusions
+        pattern_types = [
+            ("url", "url"),
+            ("html_a_tag", "html_tag"),
+            ("inline_code", "inline_code"),
+            ("wiki", "wikilink"),
+            ("regular_link", "regular_link"),
+            ("template_var", "template_variable"),
+            ("template_block", "template_variable"),
+            ("template_asp", "template_variable"),
+            ("template_asp_comment", "template_variable"),
+        ]
+
+        for pattern_key, zone_type in pattern_types:
+            for match in patterns[pattern_key].finditer(line):
+                exclusion_zones.append(
+                    TextRange(
+                        start_line=line_num,
+                        start_column=match.start(),
+                        end_line=line_num,
+                        end_column=match.end(),
+                        zone_type=zone_type,
+                    )
+                )
 
     def find_link_candidates(
         self,
@@ -273,7 +294,7 @@ class LinkAnalysisService:
         exclusion_zones: list[TextRange] | None = None,
         current_file_id: str | None = None,
     ) -> list[LinkCandidate]:
-        """Find text that could be converted to WikiLinks.
+        """Find text that could be converted to WikiLinks with Japanese variations.
 
         Args:
             content: The markdown content to analyze
@@ -290,32 +311,22 @@ class LinkAnalysisService:
         candidates = []
         lines = content.split("\n")
 
-        # Build a lookup of titles and aliases to file IDs
-        title_to_file = {}
-        alias_to_file = {}
+        # Build enhanced lookup with Japanese variations
+        enhanced_targets = self._build_enhanced_target_lookup(file_registry)
 
-        for file_id, file in file_registry.items():
-            # Map title to file ID
-            if file.frontmatter.title:
-                title_to_file[file.frontmatter.title.lower()] = file_id
-
-            # Map aliases to file ID
-            for alias in file.frontmatter.aliases:
-                alias_to_file[alias.lower()] = file_id
-
-        # Combine all possible link targets
-        all_targets = {**title_to_file, **alias_to_file}
+        # Track positions to avoid duplicates
+        seen_positions = set()
 
         for line_num, line in enumerate(lines, 1):
             # Find potential matches for each target
-            for target_text, file_id in all_targets.items():
+            for target_info in enhanced_targets:
                 # Avoid self-linking
-                if current_file_id and file_id == current_file_id:
+                if current_file_id and target_info["file_id"] == current_file_id:
                     continue
 
                 # Use word boundaries to find exact matches
                 pattern = re.compile(
-                    r"\b" + re.escape(target_text) + r"\b", re.IGNORECASE
+                    r"\b" + re.escape(target_info["text"]) + r"\b", re.IGNORECASE
                 )
 
                 for match in pattern.finditer(line):
@@ -329,17 +340,31 @@ class LinkAnalysisService:
                     if self._is_in_exclusion_zone(position, exclusion_zones):
                         continue
 
+                    # Create position key for deduplication
+                    position_key = (
+                        line_num,
+                        match.start(),
+                        match.end(),
+                        target_info["file_id"],
+                    )
+                    if position_key in seen_positions:
+                        continue
+                    seen_positions.add(position_key)
+
                     # Determine the best alias to use
                     matched_text = match.group()
-                    suggested_alias = self._determine_best_alias(
-                        matched_text, file_registry[file_id]
+                    target_file = file_registry[target_info["file_id"]]
+                    suggested_alias = self._determine_best_alias_with_japanese(
+                        matched_text, target_file, target_info
                     )
 
                     candidate = LinkCandidate(
                         text=matched_text,
-                        target_file_id=file_id,
+                        target_file_id=target_info["file_id"],
                         suggested_alias=suggested_alias,
                         position=position,
+                        confidence=target_info.get("confidence", 1.0),
+                        variation_type=target_info.get("source_type"),
                     )
                     candidates.append(candidate)
 
@@ -538,3 +563,325 @@ class LinkAnalysisService:
                 body_lines.append(line)
 
         return "\n".join(body_lines)
+
+    def _build_enhanced_target_lookup(
+        self, file_registry: dict[str, MarkdownFile]
+    ) -> list[dict[str, Any]]:
+        """Build enhanced target lookup with Japanese variations and cross-language.
+
+        Returns:
+            List of target dictionaries with text, file_id, source_type, and confidence
+        """
+        enhanced_targets = []
+
+        for file_id, file in file_registry.items():
+            # Add title as target
+            if file.frontmatter.title:
+                enhanced_targets.append({
+                    "text": file.frontmatter.title.lower(),
+                    "file_id": file_id,
+                    "source_type": "title",
+                    "confidence": 1.0,
+                    "original_text": file.frontmatter.title,
+                })
+
+                # Add Japanese variations of title if Japanese processing is enabled
+                if self.japanese_enabled:
+                    title_variations = (
+                        self.tag_pattern_manager.find_japanese_variations(
+                            file.frontmatter.title
+                        )
+                    )
+                    for variation in title_variations:
+                        if variation.lower() != file.frontmatter.title.lower():
+                            enhanced_targets.append({
+                                "text": variation.lower(),
+                                "file_id": file_id,
+                                "source_type": "title_variation",
+                                "confidence": 0.9,
+                                "original_text": variation,
+                                "variation_of": file.frontmatter.title,
+                            })
+
+            # Add aliases as targets
+            for alias in file.frontmatter.aliases:
+                enhanced_targets.append({
+                    "text": alias.lower(),
+                    "file_id": file_id,
+                    "source_type": "alias",
+                    "confidence": 1.0,
+                    "original_text": alias,
+                })
+
+                # Add Japanese variations of aliases
+                if self.japanese_enabled:
+                    alias_variations = (
+                        self.tag_pattern_manager.find_japanese_variations(alias)
+                    )
+                    for variation in alias_variations:
+                        if variation.lower() != alias.lower():
+                            enhanced_targets.append({
+                                "text": variation.lower(),
+                                "file_id": file_id,
+                                "source_type": "alias_variation",
+                                "confidence": 0.9,
+                                "original_text": variation,
+                                "variation_of": alias,
+                            })
+
+        return enhanced_targets
+
+    def _determine_best_alias_with_japanese(
+        self, matched_text: str, target_file: MarkdownFile, target_info: dict[str, Any]
+    ) -> str | None:
+        """Determine the best alias to use for a WikiLink with Japanese variations."""
+        # If the matched text is the same as the title, no alias needed
+        if (
+            target_file.frontmatter.title
+            and matched_text.lower() == target_file.frontmatter.title.lower()
+        ):
+            return None
+
+        # If the matched text is in the aliases, use it as alias
+        for alias in target_file.frontmatter.aliases:
+            if matched_text.lower() == alias.lower():
+                return matched_text
+
+        # If this is a Japanese variation, use the original text as alias
+        if target_info.get("source_type") in ["title_variation", "alias_variation"]:
+            return target_info.get("original_text", matched_text)
+
+        # Otherwise, use the matched text as alias
+        return matched_text
+
+    def suggest_bidirectional_aliases(
+        self, file_registry: dict[str, MarkdownFile]
+    ) -> dict[str, list[str]]:
+        """Suggest bidirectional aliases based on Japanese variations.
+
+        Returns:
+            Dictionary mapping file_id to list of suggested aliases
+        """
+        suggestions = {}
+
+        if not self.japanese_enabled:
+            return suggestions
+
+        for file_id, file in file_registry.items():
+            suggested_aliases = []
+
+            # Check title for cross-language opportunities
+            if file.frontmatter.title:
+                title_variations = self.tag_pattern_manager.find_japanese_variations(
+                    file.frontmatter.title
+                )
+                for variation in title_variations:
+                    if (
+                        variation not in file.frontmatter.aliases
+                        and variation.lower() != file.frontmatter.title.lower()
+                    ):
+                        suggested_aliases.append(variation)
+
+            # Check existing aliases for additional variations
+            for alias in file.frontmatter.aliases:
+                alias_variations = self.tag_pattern_manager.find_japanese_variations(
+                    alias
+                )
+                for variation in alias_variations:
+                    if (
+                        variation not in file.frontmatter.aliases
+                        and variation not in suggested_aliases
+                        and variation.lower() != file.frontmatter.title.lower()
+                    ):
+                        suggested_aliases.append(variation)
+
+            # Check content for English-Japanese matches
+            content_matches = self._find_english_japanese_content_matches(file)
+            for match in content_matches:
+                if (
+                    match not in file.frontmatter.aliases
+                    and match not in suggested_aliases
+                    and match.lower() != file.frontmatter.title.lower()
+                ):
+                    suggested_aliases.append(match)
+
+            if suggested_aliases:
+                suggestions[file_id] = suggested_aliases
+
+        return suggestions
+
+    def _find_english_japanese_content_matches(self, file: MarkdownFile) -> list[str]:
+        """Find English-Japanese term matches in file content."""
+        matches = []
+        content = file.content
+
+        # Process English-Japanese pairs
+        english_japanese_matches = self._process_english_japanese_pairs(content)
+        matches.extend(english_japanese_matches)
+
+        # Process abbreviation expansions
+        abbreviation_matches = self._process_abbreviation_expansions(content)
+        matches.extend(abbreviation_matches)
+
+        return list(set(matches))  # Remove duplicates
+
+    def _process_english_japanese_pairs(self, content: str) -> list[str]:
+        """Process English-Japanese pairs for content matches."""
+        matches = []
+        english_japanese_pairs = self.tag_pattern_manager.japanese_variations.get(
+            "english_japanese_pairs", {}
+        )
+
+        for english, data in english_japanese_pairs.items():
+            pair_matches = self._extract_pair_matches(english, data, content)
+            matches.extend(pair_matches)
+
+        return matches
+
+    def _extract_pair_matches(self, english: str, data: Any, content: str) -> list[str]:
+        """Extract matches for a single English-Japanese pair."""
+        matches = []
+        english_lower = english.lower()
+
+        # Handle new YAML structure with japanese and aliases
+        if isinstance(data, dict):
+            japanese_terms = data.get("japanese", [])
+            aliases = data.get("aliases", [])
+            all_terms = japanese_terms + aliases
+        else:
+            # Fallback for old format
+            all_terms = data if isinstance(data, list) else [data]
+
+        # Check for English term in content
+        if english_lower in content.lower():
+            for term in japanese_terms if isinstance(data, dict) else all_terms:
+                if isinstance(term, str):
+                    matches.append(term)
+
+        # Check for Japanese/alias terms in content
+        for term in all_terms:
+            if isinstance(term, str) and term in content:
+                matches.append(english)
+
+        return matches
+
+    def _process_abbreviation_expansions(self, content: str) -> list[str]:
+        """Process abbreviation expansions for content matches."""
+        matches = []
+        abbreviations = self.tag_pattern_manager.japanese_variations.get(
+            "abbreviation_expansions", {}
+        )
+
+        for abbrev, expansion_data in abbreviations.items():
+            if isinstance(expansion_data, dict):
+                abbrev_matches = self._extract_abbreviation_matches(
+                    abbrev, expansion_data, content
+                )
+                matches.extend(abbrev_matches)
+
+        return matches
+
+    def _extract_abbreviation_matches(
+        self, abbrev: str, expansion_data: dict[str, Any], content: str
+    ) -> list[str]:
+        """Extract matches for a single abbreviation expansion."""
+        matches = []
+        full_form = expansion_data.get("full_form", "")
+        english_form = expansion_data.get("english", "")
+        variations = expansion_data.get("variations", [])
+
+        # Check for abbreviation in content
+        if abbrev.lower() in content.lower():
+            if full_form:
+                matches.append(full_form)
+            if english_form:
+                matches.append(english_form)
+
+        # Check for variations in content
+        for variation in variations:
+            if variation.lower() in content.lower():
+                if full_form:
+                    matches.append(full_form)
+                if english_form:
+                    matches.append(english_form)
+
+        return matches
+
+    def analyze_japanese_linking_opportunities(
+        self, files: list[MarkdownFile]
+    ) -> dict[str, Any]:
+        """Analyze Japanese linking opportunities across the vault.
+
+        Returns:
+            Analysis report with Japanese-specific linking statistics and opportunities
+        """
+        if not self.japanese_enabled:
+            return {"error": "Japanese processing is not enabled"}
+
+        analysis = {
+            "total_files": len(files),
+            "files_with_japanese_content": 0,
+            "katakana_variation_opportunities": 0,
+            "english_japanese_cross_references": 0,
+            "bidirectional_alias_suggestions": 0,
+            "mixed_language_files": 0,
+            "technical_term_opportunities": 0,
+        }
+
+        # Build file registry for analysis
+        file_registry = {
+            file.frontmatter.id: file for file in files if file.frontmatter.id
+        }
+
+        # Analyze each file
+        for file in files:
+            content = file.content
+
+            # Detect Japanese content
+            japanese_chars = len(
+                re.findall(r"[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]", content)
+            )
+            english_words = len(re.findall(r"\b[a-zA-Z]+\b", content))
+
+            if japanese_chars > 0:
+                analysis["files_with_japanese_content"] += 1
+
+            if japanese_chars > 0 and english_words > 0:
+                analysis["mixed_language_files"] += 1
+
+            # Check for katakana variation opportunities
+            katakana_matches = re.findall(r"[\u30A0-\u30FF]+", content)
+            for katakana in katakana_matches:
+                variations = self.tag_pattern_manager.find_japanese_variations(katakana)
+                if len(variations) > 1:  # Has variations
+                    analysis["katakana_variation_opportunities"] += 1
+
+            # Check for English-Japanese cross-reference opportunities
+            content_matches = self._find_english_japanese_content_matches(file)
+            if content_matches:
+                analysis["english_japanese_cross_references"] += len(content_matches)
+
+            # Check for technical term opportunities
+            english_japanese_pairs = self.tag_pattern_manager.japanese_variations.get(
+                "english_japanese_pairs", {}
+            )
+            for english, _data in english_japanese_pairs.items():
+                if english.lower() in content.lower():
+                    analysis["technical_term_opportunities"] += 1
+
+        # Get bidirectional alias suggestions
+        alias_suggestions = self.suggest_bidirectional_aliases(file_registry)
+        analysis["bidirectional_alias_suggestions"] = sum(
+            len(suggestions) for suggestions in alias_suggestions.values()
+        )
+
+        # Calculate percentages
+        if analysis["total_files"] > 0:
+            analysis["japanese_content_percentage"] = (
+                analysis["files_with_japanese_content"] / analysis["total_files"] * 100
+            )
+            analysis["mixed_language_percentage"] = (
+                analysis["mixed_language_files"] / analysis["total_files"] * 100
+            )
+
+        return analysis

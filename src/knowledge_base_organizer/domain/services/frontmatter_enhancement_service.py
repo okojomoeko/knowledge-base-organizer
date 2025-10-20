@@ -109,21 +109,27 @@ class FrontmatterEnhancementService:
                     if full_form:
                         matches.append((abbrev, full_form, "abbreviation_to_japanese"))
                     if english_form:
-                        matches.append(
-                            (abbrev, english_form, "abbreviation_to_english")
-                        )
+                        matches.append((
+                            abbrev,
+                            english_form,
+                            "abbreviation_to_english",
+                        ))
 
                 # Check for variations in content
                 for variation in variations:
                     if variation.lower() in content_lower:
                         if full_form and variation != full_form:
-                            matches.append(
-                                (variation, full_form, "variation_to_japanese")
-                            )
+                            matches.append((
+                                variation,
+                                full_form,
+                                "variation_to_japanese",
+                            ))
                         if english_form and variation != english_form:
-                            matches.append(
-                                (variation, english_form, "variation_to_english")
-                            )
+                            matches.append((
+                                variation,
+                                english_form,
+                                "variation_to_english",
+                            ))
 
         return matches
 
@@ -1030,9 +1036,9 @@ class FrontmatterEnhancementService:
             "tag_coverage": {
                 "files_with_tags": analysis.total_files
                 - len([f for f in analysis.tag_frequency.values() if f == 0]),
-                "files_without_tags": len(
-                    [f for f in analysis.tag_frequency.values() if f == 0]
-                ),
+                "files_without_tags": len([
+                    f for f in analysis.tag_frequency.values() if f == 0
+                ]),
             },
         }
 

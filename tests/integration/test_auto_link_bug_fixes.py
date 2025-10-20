@@ -78,7 +78,7 @@ def config():
 def auto_link_use_case(config):
     """Auto-link generation use case with dependencies."""
     file_repository = FileRepository(config)
-    link_analysis_service = LinkAnalysisService()
+    link_analysis_service = LinkAnalysisService(config_dir=None)
     content_processing_service = ContentProcessingService()
 
     return AutoLinkGenerationUseCase(

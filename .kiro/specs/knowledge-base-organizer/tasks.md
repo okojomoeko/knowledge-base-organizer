@@ -386,7 +386,7 @@
         - _Requirements: 19.1, 19.6_
         - _既存コード拡張: TagPatternManager.py 約50行追加_
 
-    - [-] 12.2 英日対訳システムの実装（高優先）
+    - [x] 12.2 英日対訳システムの実装（高優先）
         - 技術用語辞書をYAMLファイルで管理（API ↔ エーピーアイ）
         - 略語展開辞書（DB → データベース）
         - 既存のFrontmatterEnhancementServiceに統合
@@ -394,7 +394,7 @@
         - _Requirements: 19.2, 19.4, 19.5_
         - _既存コード拡張: FrontmatterEnhancementService.py 約30行追加_
 
-    - [ ] 12.3 日本語処理のauto-link統合（中優先）
+    - [x] 12.3 日本語処理のauto-link統合（中優先）
         - 既存のLinkAnalysisService.find_link_candidatesに日本語バリエーション追加
         - カタカナ・英日対訳を使った候補拡張
         - 双方向エイリアス提案機能
