@@ -40,6 +40,9 @@ class FrontmatterEnhancementService:
         # Initialize English-Japanese translation patterns
         self.english_japanese_patterns = self._load_english_japanese_patterns()
 
+        # Initialize legacy patterns
+        self._initialize_legacy_patterns()
+
     def _load_english_japanese_patterns(self) -> dict[str, list[str]]:
         """Load English-Japanese translation patterns from TagPatternManager."""
         try:
@@ -60,19 +63,67 @@ class FrontmatterEnhancementService:
         matches = []
         content_lower = content.lower()
 
-        for english, japanese_terms in self.english_japanese_patterns.items():
+        # Get English-Japanese pairs from TagPatternManager
+        english_japanese_pairs = self.tag_pattern_manager.japanese_variations.get(
+            "english_japanese_pairs", {}
+        )
+
+        for english, data in english_japanese_pairs.items():
             english_lower = english.lower()
+
+            # Handle new YAML structure with japanese and aliases
+            if isinstance(data, dict):
+                japanese_terms = data.get("japanese", [])
+                aliases = data.get("aliases", [])
+                all_terms = japanese_terms + aliases
+            else:
+                # Fallback for old format
+                all_terms = data if isinstance(data, list) else [data]
 
             # Check for English term in content
             if english_lower in content_lower:
-                for japanese_term in japanese_terms:
-                    if isinstance(japanese_term, str):
-                        matches.append((english, japanese_term, "english_to_japanese"))
+                for term in japanese_terms if isinstance(data, dict) else all_terms:
+                    if isinstance(term, str):
+                        matches.append((english, term, "english_to_japanese"))
 
-            # Check for Japanese terms in content
-            for japanese_term in japanese_terms:
-                if isinstance(japanese_term, str) and japanese_term in content:
-                    matches.append((japanese_term, english, "japanese_to_english"))
+            # Check for Japanese/alias terms in content
+            for term in all_terms:
+                if isinstance(term, str) and term in content:
+                    matches.append((term, english, "japanese_to_english"))
+
+        # Also check abbreviation expansions
+        abbreviations = self.tag_pattern_manager.japanese_variations.get(
+            "abbreviation_expansions", {}
+        )
+
+        for abbrev, expansion_data in abbreviations.items():
+            abbrev_lower = abbrev.lower()
+
+            if isinstance(expansion_data, dict):
+                full_form = expansion_data.get("full_form", "")
+                english_form = expansion_data.get("english", "")
+                variations = expansion_data.get("variations", [])
+
+                # Check for abbreviation in content
+                if abbrev_lower in content_lower:
+                    if full_form:
+                        matches.append((abbrev, full_form, "abbreviation_to_japanese"))
+                    if english_form:
+                        matches.append(
+                            (abbrev, english_form, "abbreviation_to_english")
+                        )
+
+                # Check for variations in content
+                for variation in variations:
+                    if variation.lower() in content_lower:
+                        if full_form and variation != full_form:
+                            matches.append(
+                                (variation, full_form, "variation_to_japanese")
+                            )
+                        if english_form and variation != english_form:
+                            matches.append(
+                                (variation, english_form, "variation_to_english")
+                            )
 
         return matches
 
@@ -85,12 +136,14 @@ class FrontmatterEnhancementService:
 
         # Also check existing aliases for cross-language opportunities
         existing_aliases = file.frontmatter.aliases or []
+        existing_title = file.frontmatter.title or ""
 
-        for original_term, matched_term, match_type in matches:
+        for _original_term, matched_term, _match_type in matches:
             # Suggest the matched term as an alias if not already present
             if (
                 matched_term not in existing_aliases
                 and matched_term not in suggested_aliases
+                and matched_term.lower() != existing_title.lower()
             ):
                 suggested_aliases.append(matched_term)
 
@@ -101,12 +154,158 @@ class FrontmatterEnhancementService:
                 if (
                     variation not in existing_aliases
                     and variation not in suggested_aliases
+                    and variation.lower() != existing_title.lower()
                 ):
                     suggested_aliases.append(variation)
 
+        # Check title for cross-language opportunities
+        if existing_title:
+            title_matches = self.find_english_japanese_matches(existing_title)
+            for _original_term, matched_term, _match_type in title_matches:
+                if (
+                    matched_term not in existing_aliases
+                    and matched_term not in suggested_aliases
+                    and matched_term.lower() != existing_title.lower()
+                ):
+                    suggested_aliases.append(matched_term)
+
+        # Also suggest abbreviation expansions for existing aliases
+        abbreviations = self.tag_pattern_manager.japanese_variations.get(
+            "abbreviation_expansions", {}
+        )
+
+        for alias in [*existing_aliases, existing_title]:
+            if not alias:
+                continue
+
+            alias_upper = alias.upper()
+            alias_lower = alias.lower()
+
+            # Check if alias matches any abbreviation
+            for abbrev, expansion_data in abbreviations.items():
+                if isinstance(expansion_data, dict):
+                    full_form = expansion_data.get("full_form", "")
+                    english_form = expansion_data.get("english", "")
+                    variations = expansion_data.get("variations", [])
+
+                    # If alias matches abbreviation, suggest expansions
+                    if alias_upper == abbrev.upper() or alias_lower in [
+                        v.lower() for v in variations
+                    ]:
+                        if (
+                            full_form
+                            and full_form not in existing_aliases
+                            and full_form not in suggested_aliases
+                        ):
+                            suggested_aliases.append(full_form)
+                        if (
+                            english_form
+                            and english_form not in existing_aliases
+                            and english_form not in suggested_aliases
+                        ):
+                            suggested_aliases.append(english_form)
+
         return suggested_aliases
 
-        # Legacy advanced tag patterns (kept for backward compatibility)
+    def extract_technical_terms_from_content(self, content: str) -> list[str]:
+        """Extract technical terms from content using English-Japanese dictionary."""
+        technical_terms = []
+        content_lower = content.lower()
+
+        # Get English-Japanese pairs and abbreviations
+        english_japanese_pairs = self.tag_pattern_manager.japanese_variations.get(
+            "english_japanese_pairs", {}
+        )
+        abbreviations = self.tag_pattern_manager.japanese_variations.get(
+            "abbreviation_expansions", {}
+        )
+
+        # Check for English technical terms
+        for english, data in english_japanese_pairs.items():
+            if english.lower() in content_lower:
+                technical_terms.append(english)
+
+            # Also check aliases
+            if isinstance(data, dict):
+                aliases = data.get("aliases", [])
+                for alias in aliases:
+                    if isinstance(alias, str) and alias.lower() in content_lower:
+                        technical_terms.append(english)  # Add the canonical form
+                        break
+
+        # Check for abbreviations
+        for abbrev, expansion_data in abbreviations.items():
+            if isinstance(expansion_data, dict):
+                variations = expansion_data.get("variations", [])
+
+                # Check abbreviation itself
+                if abbrev.lower() in content_lower:
+                    technical_terms.append(abbrev)
+
+                # Check variations
+                for variation in variations:
+                    if (
+                        isinstance(variation, str)
+                        and variation.lower() in content_lower
+                    ):
+                        technical_terms.append(abbrev)  # Add the canonical form
+                        break
+
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_terms = []
+        for term in technical_terms:
+            if term not in seen:
+                seen.add(term)
+                unique_terms.append(term)
+
+        return unique_terms
+
+    def suggest_technical_tags_from_content(self, file: MarkdownFile) -> list[str]:
+        """Suggest technical tags based on content analysis.
+
+        Uses English-Japanese patterns for technical term detection.
+        """
+        suggested_tags = []
+
+        # Extract technical terms from content
+        technical_terms = self.extract_technical_terms_from_content(file.content)
+
+        # Convert technical terms to appropriate tags
+        for term in technical_terms:
+            # Use lowercase for consistency
+            tag = term.lower()
+
+            # Add technology-related prefix for clarity if needed
+            if len(tag) <= 3:  # Short abbreviations like API, DB, etc.
+                tag = f"tech-{tag}"
+
+            suggested_tags.append(tag)
+
+        # Also check for Japanese technical terms in content
+        content = file.content
+
+        # Look for Japanese technical terms from the dictionary
+        english_japanese_pairs = self.tag_pattern_manager.japanese_variations.get(
+            "english_japanese_pairs", {}
+        )
+
+        for english, data in english_japanese_pairs.items():
+            if isinstance(data, dict):
+                japanese_terms = data.get("japanese", [])
+                for japanese_term in japanese_terms:
+                    if isinstance(japanese_term, str) and japanese_term in content:
+                        # Suggest the English equivalent as a tag
+                        tag = english.lower()
+                        if len(tag) <= 3:
+                            tag = f"tech-{tag}"
+                        if tag not in suggested_tags:
+                            suggested_tags.append(tag)
+
+        return suggested_tags
+
+    def _initialize_legacy_patterns(self) -> None:
+        """Initialize legacy advanced tag patterns (kept for backward compatibility)."""
         self.advanced_tag_patterns = {
             "programming_languages": {
                 "python": ["python", "py", "django", "flask", "pandas", "numpy"],
@@ -444,6 +643,20 @@ class FrontmatterEnhancementService:
                         f"Added intelligent tags: {new_intelligent_tags}"
                     )
 
+            # 1.1. Apply technical tag suggestions from English-Japanese patterns
+            # (Requirement 19.2)
+            technical_tags = self.suggest_technical_tags_from_content(file)
+            if technical_tags:
+                current_tags = enhanced_frontmatter.get("tags", [])
+                new_technical_tags = [
+                    tag for tag in technical_tags if tag not in current_tags
+                ]
+                if new_technical_tags:
+                    enhanced_frontmatter["tags"] = current_tags + new_technical_tags
+                    changes_applied.append(
+                        f"Added technical tags: {new_technical_tags}"
+                    )
+
             # 2. Extract and populate metadata from content (Requirement 8.2)
             extracted_metadata = self.extract_metadata_from_content(file)
             for field_name, value in extracted_metadata.items():
@@ -464,7 +677,8 @@ class FrontmatterEnhancementService:
                     enhanced_frontmatter[field_name] = date_value
                     changes_applied.append(f"Added date {field_name}: {date_value}")
 
-            # 4. Apply English-Japanese cross-language alias suggestions (Requirement 19.2)
+            # 4. Apply English-Japanese cross-language alias suggestions
+            # (Requirement 19.2)
             cross_language_aliases = self.suggest_cross_language_aliases(file)
             if cross_language_aliases:
                 current_aliases = enhanced_frontmatter.get("aliases", [])

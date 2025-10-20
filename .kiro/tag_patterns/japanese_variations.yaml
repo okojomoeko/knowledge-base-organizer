@@ -130,6 +130,222 @@ english_japanese_pairs:
       - "sql"
       - "query"
 
+  # 追加の技術用語
+  "AI":
+    japanese:
+      - "エーアイ"
+      - "人工知能"
+      - "じんこうちのう"
+    aliases:
+      - "ai"
+      - "artificial intelligence"
+
+  "ML":
+    japanese:
+      - "エムエル"
+      - "機械学習"
+      - "きかいがくしゅう"
+    aliases:
+      - "ml"
+      - "machine learning"
+
+  "DL":
+    japanese:
+      - "ディーエル"
+      - "深層学習"
+      - "しんそうがくしゅう"
+    aliases:
+      - "dl"
+      - "deep learning"
+
+  "IoT":
+    japanese:
+      - "アイオーティー"
+      - "モノのインターネット"
+    aliases:
+      - "iot"
+      - "internet of things"
+
+  "VR":
+    japanese:
+      - "ブイアール"
+      - "仮想現実"
+      - "かそうげんじつ"
+    aliases:
+      - "vr"
+      - "virtual reality"
+
+  "AR":
+    japanese:
+      - "エーアール"
+      - "拡張現実"
+      - "かくちょうげんじつ"
+    aliases:
+      - "ar"
+      - "augmented reality"
+
+  "OS":
+    japanese:
+      - "オーエス"
+      - "オペレーティングシステム"
+    aliases:
+      - "os"
+      - "operating system"
+
+  "CPU":
+    japanese:
+      - "シーピーユー"
+      - "中央処理装置"
+      - "ちゅうおうしょりそうち"
+    aliases:
+      - "cpu"
+      - "processor"
+
+  "GPU":
+    japanese:
+      - "ジーピーユー"
+      - "グラフィック処理装置"
+    aliases:
+      - "gpu"
+      - "graphics card"
+
+  "RAM":
+    japanese:
+      - "ラム"
+      - "メモリ"
+      - "主記憶装置"
+    aliases:
+      - "ram"
+      - "memory"
+
+  "SSD":
+    japanese:
+      - "エスエスディー"
+      - "ソリッドステートドライブ"
+    aliases:
+      - "ssd"
+      - "solid state drive"
+
+  "HDD":
+    japanese:
+      - "エイチディーディー"
+      - "ハードディスクドライブ"
+    aliases:
+      - "hdd"
+      - "hard disk"
+
+# 略語展開辞書
+abbreviation_expansions:
+  # データベース関連
+  "DB":
+    full_form: "データベース"
+    english: "Database"
+    variations:
+      - "db"
+      - "データベース"
+      - "database"
+
+  "RDBMS":
+    full_form: "リレーショナルデータベース管理システム"
+    english: "Relational Database Management System"
+    variations:
+      - "rdbms"
+      - "relational database"
+
+  "NoSQL":
+    full_form: "非リレーショナルデータベース"
+    english: "Not Only SQL"
+    variations:
+      - "nosql"
+      - "non-relational database"
+
+  # プログラミング関連
+  "OOP":
+    full_form: "オブジェクト指向プログラミング"
+    english: "Object-Oriented Programming"
+    variations:
+      - "oop"
+      - "object oriented"
+
+  "MVC":
+    full_form: "モデルビューコントローラー"
+    english: "Model-View-Controller"
+    variations:
+      - "mvc"
+      - "model view controller"
+
+  "REST":
+    full_form: "レプリゼンテーショナルステートトランスファー"
+    english: "Representational State Transfer"
+    variations:
+      - "rest"
+      - "restful"
+
+  "CRUD":
+    full_form: "作成読取更新削除"
+    english: "Create, Read, Update, Delete"
+    variations:
+      - "crud"
+      - "create read update delete"
+
+  # ネットワーク関連
+  "TCP":
+    full_form: "トランスミッションコントロールプロトコル"
+    english: "Transmission Control Protocol"
+    variations:
+      - "tcp"
+      - "transmission control"
+
+  "UDP":
+    full_form: "ユーザーデータグラムプロトコル"
+    english: "User Datagram Protocol"
+    variations:
+      - "udp"
+      - "user datagram"
+
+  "DNS":
+    full_form: "ドメインネームシステム"
+    english: "Domain Name System"
+    variations:
+      - "dns"
+      - "domain name"
+
+  "HTTPS":
+    full_form: "ハイパーテキストトランスファープロトコルセキュア"
+    english: "HyperText Transfer Protocol Secure"
+    variations:
+      - "https"
+      - "secure http"
+
+  # セキュリティ関連
+  "SSL":
+    full_form: "セキュアソケットレイヤー"
+    english: "Secure Sockets Layer"
+    variations:
+      - "ssl"
+      - "secure socket"
+
+  "TLS":
+    full_form: "トランスポートレイヤーセキュリティ"
+    english: "Transport Layer Security"
+    variations:
+      - "tls"
+      - "transport security"
+
+  "JWT":
+    full_form: "ジェイソンウェブトークン"
+    english: "JSON Web Token"
+    variations:
+      - "jwt"
+      - "json token"
+
+  "OAuth":
+    full_form: "オープン認証"
+    english: "Open Authorization"
+    variations:
+      - "oauth"
+      - "open auth"
+
 # 日本語固有の表記ゆれ
 japanese_specific_patterns:
   # ひらがな・カタカナ混在

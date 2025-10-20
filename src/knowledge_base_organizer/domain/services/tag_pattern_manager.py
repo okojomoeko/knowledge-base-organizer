@@ -144,6 +144,7 @@ class TagPatternManager:
             "long_vowel_patterns": yaml_data.get("long_vowel_patterns", {}),
             "consonant_patterns": yaml_data.get("consonant_patterns", {}),
             "english_japanese_pairs": {},
+            "abbreviation_expansions": yaml_data.get("abbreviation_expansions", {}),
         }
 
         # Convert english_japanese_pairs format
@@ -172,6 +173,18 @@ class TagPatternManager:
             "english_japanese_pairs": {
                 "API": ["エーピーアイ", "api"],
                 "DB": ["データベース", "db"],
+            },
+            "abbreviation_expansions": {
+                "DB": {
+                    "full_form": "データベース",
+                    "english": "Database",
+                    "variations": ["db", "database"],
+                },
+                "API": {
+                    "full_form": "エーピーアイ",
+                    "english": "Application Programming Interface",
+                    "variations": ["api"],
+                },
             },
         }
 
