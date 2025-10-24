@@ -329,8 +329,10 @@ class AutoLinkGenerationUseCase:
                 if update.update_type == "add_wikilink" and update.new_content:
                     # Update the content of the MarkdownFile object
                     markdown_file.content = update.new_content
-                    # Save the entire file, which preserves frontmatter
-                    self.file_repository.save_file(markdown_file, backup=True)
+                    # Save the entire file, preserving original frontmatter format
+                    self.file_repository.save_file(
+                        markdown_file, backup=True, preserve_frontmatter=True
+                    )
 
                 elif update.update_type == "add_alias" and update.frontmatter_changes:
                     # Update frontmatter with new aliases

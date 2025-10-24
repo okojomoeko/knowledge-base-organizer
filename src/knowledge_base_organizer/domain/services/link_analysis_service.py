@@ -25,6 +25,7 @@ class FrontmatterState:
 
     start_line: int | None = None
     in_frontmatter: bool = False
+    frontmatter_processed: bool = False  # Track if frontmatter has been processed
 
 
 class LinkCandidate(BaseModel):
@@ -147,7 +148,7 @@ class LinkAnalysisService:
             "wiki": re.compile(r"\[\[([^\]]+)\]\]"),
             "regular_link": re.compile(r"\[([^\]]+)\]\(([^)]+)\)"),
             "link_ref": re.compile(
-                r"^\[([^|\]]+)\|([^\]]+)\]:\s*([^\s]+)(?:\s+\"([^\"]+)\")?"
+                r"\[([^|\]]+)\|([^\]]+)\]:\s*([^\s]+)(?:\s+\"([^\"]+)\")?"
             ),
             "url": re.compile(r"https?://[^\s)]+"),
             "template_var": re.compile(r"\$\{[^}]*\}"),
@@ -199,9 +200,19 @@ class LinkAnalysisService:
         frontmatter_state: FrontmatterState,
         exclusion_zones: list[TextRange],
     ) -> None:
-        """Handle frontmatter detection and zone creation."""
+        """Handle frontmatter detection and zone creation.
+
+        Frontmatter should only be detected at the beginning of the file.
+        Subsequent '---' lines are treated as horizontal rules, not frontmatter.
+        """
         if line.strip() == "---":
-            if frontmatter_state.start_line is None:
+            # Only detect frontmatter if we're at line 1 and haven't processed any yet
+            if (
+                line_num == 1
+                and frontmatter_state.start_line is None
+                and not frontmatter_state.frontmatter_processed
+            ):
+                # Start frontmatter (only at the very beginning)
                 frontmatter_state.start_line = line_num
                 frontmatter_state.in_frontmatter = True
             elif frontmatter_state.in_frontmatter:
@@ -217,6 +228,8 @@ class LinkAnalysisService:
                 )
                 frontmatter_state.start_line = None
                 frontmatter_state.in_frontmatter = False
+                frontmatter_state.frontmatter_processed = True
+            # All other '---' lines are treated as horizontal rules, not frontmatter
 
     def _process_line_exclusions(
         self,
@@ -238,14 +251,14 @@ class LinkAnalysisService:
                 )
             )
 
-        # Link Reference Definitions
-        if patterns["link_ref"].match(line.strip()):
+        # Link Reference Definitions - use finditer to catch all LRDs in a line
+        for match in patterns["link_ref"].finditer(line):
             exclusion_zones.append(
                 TextRange(
                     start_line=line_num,
-                    start_column=0,
+                    start_column=match.start(),
                     end_line=line_num,
-                    end_column=len(line),
+                    end_column=match.end(),
                     zone_type="link_ref_def",
                 )
             )
@@ -632,26 +645,17 @@ class LinkAnalysisService:
         return enhanced_targets
 
     def _determine_best_alias_with_japanese(
-        self, matched_text: str, target_file: MarkdownFile, target_info: dict[str, Any]
+        self,
+        matched_text: str,
+        target_file: MarkdownFile,
+        target_info: dict[str, Any],  # noqa: ARG002
     ) -> str | None:
-        """Determine the best alias to use for a WikiLink with Japanese variations."""
-        # If the matched text is the same as the title, no alias needed
-        if (
-            target_file.frontmatter.title
-            and matched_text.lower() == target_file.frontmatter.title.lower()
-        ):
-            return None
+        """Determine the best alias to use for a WikiLink with Japanese variations.
 
-        # If the matched text is in the aliases, use it as alias
-        for alias in target_file.frontmatter.aliases:
-            if matched_text.lower() == alias.lower():
-                return matched_text
-
-        # If this is a Japanese variation, use the original text as alias
-        if target_info.get("source_type") in ["title_variation", "alias_variation"]:
-            return target_info.get("original_text", matched_text)
-
-        # Otherwise, use the matched text as alias
+        Always include alias for better readability and consistency.
+        """
+        # Always use the matched text as alias for better readability
+        # This ensures that [[file_id|readable_text]] format is used consistently
         return matched_text
 
     def suggest_bidirectional_aliases(

@@ -76,13 +76,23 @@ class FileRepository:
         *,
         backup: bool = True,
         template_order: list[str] | None = None,
+        preserve_frontmatter: bool = False,
     ) -> None:
-        """Save file with optional backup creation."""
+        """Save file with optional backup creation.
+
+        Args:
+            file: MarkdownFile to save
+            backup: Whether to create backup before saving
+            template_order: Order of frontmatter fields for formatting
+            preserve_frontmatter: If True, preserve original frontmatter format
+        """
         if backup and self.config.backup_enabled:
             self.create_backup(file.path)
 
         # Reconstruct full content with frontmatter
-        full_content = self._reconstruct_content(file, template_order)
+        full_content = self._reconstruct_content(
+            file, template_order, preserve_frontmatter
+        )
         file.path.write_text(full_content, encoding="utf-8")
 
     def create_backup(self, file_path: Path) -> Path:
@@ -281,9 +291,22 @@ class FileRepository:
         file_path.write_text(full_content, encoding="utf-8")
 
     def _reconstruct_content(
-        self, file: MarkdownFile, template_order: list[str] | None = None
+        self,
+        file: MarkdownFile,
+        template_order: list[str] | None = None,
+        preserve_frontmatter: bool = False,
     ) -> str:
-        """Reconstruct full content with frontmatter."""
+        """Reconstruct full content with frontmatter.
+
+        Args:
+            file: MarkdownFile to reconstruct
+            template_order: Order of frontmatter fields for formatting
+            preserve_frontmatter: If True, preserve original frontmatter format
+        """
+        if preserve_frontmatter:
+            # Preserve original frontmatter format by reading from original file
+            return self._reconstruct_content_preserving_frontmatter(file)
+
         if template_order:
             frontmatter_dict = file.frontmatter.model_dump_ordered(
                 template_order, exclude_unset=True, exclude_none=True
@@ -442,3 +465,30 @@ class FileRepository:
             pass
 
         return False
+
+    def _reconstruct_content_preserving_frontmatter(self, file: MarkdownFile) -> str:
+        """Reconstruct content while preserving original frontmatter format.
+
+        This method reads the original file and preserves the exact frontmatter
+        formatting while updating only the body content.
+        """
+        try:
+            # Read original file content
+            original_content = file.path.read_text(encoding="utf-8")
+
+            # Find frontmatter boundaries
+            frontmatter_pattern = re.compile(
+                r"^(---|\+\+\+)\s*\n(.*?)\n(---|\+\+\+)\s*\n", re.DOTALL
+            )
+            match = frontmatter_pattern.match(original_content)
+
+            if match:
+                # Preserve original frontmatter exactly as it was
+                frontmatter_section = match.group(0)
+                return frontmatter_section + file.content
+            # No frontmatter in original file, just return content
+            return file.content
+
+        except Exception:
+            # Fallback to normal reconstruction if anything goes wrong
+            return self._reconstruct_content(file, preserve_frontmatter=False)

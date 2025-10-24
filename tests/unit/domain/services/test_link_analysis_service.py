@@ -436,3 +436,122 @@ We need better interface design and INTERFACE DESIGN.
         # Should find both matches despite different cases
         assert len(candidates) == 2
         assert all(c.target_file_id == "20230101120000" for c in candidates)
+
+    def test_lrd_exclusion_with_frontmatter_boundary(self, service):
+        """Test that LRDs are correctly excluded even after frontmatter processing."""
+        content = """---
+title: Test LRD Exclusion
+id: 20250123000001
+tags: [test, lrd]
+---
+
+# Test LRD Exclusion
+
+This file mentions EC2 and ELB which should NOT be linked.
+
+---
+
+[20230727234718|EC2]: 20230727234718 "Amazon Elastic Compute Cloud (Amazon EC2)"
+[20230730201034|ELB]: 20230730201034 "Elastic Load Balancing"
+"""
+
+        zones = service.extract_exclusion_zones(content)
+
+        # Find LRD zones
+        lrd_zones = [z for z in zones if z.zone_type == "link_ref_def"]
+        assert len(lrd_zones) == 2, f"Expected 2 LRD zones, got {len(lrd_zones)}"
+
+        # Verify LRD zones are correctly positioned
+        # Debug: print actual line numbers
+        for i, zone in enumerate(lrd_zones):
+            print(f"LRD zone {i + 1}: Line {zone.start_line}")
+
+        # The LRDs should be on lines 13 and 14 (after frontmatter and content)
+        ec2_zone = next(z for z in lrd_zones if z.start_line == 13)  # EC2 LRD line
+        elb_zone = next(z for z in lrd_zones if z.start_line == 14)  # ELB LRD line
+
+        assert ec2_zone.start_column == 0
+        assert ec2_zone.end_column == 80  # Length of EC2 LRD
+        assert elb_zone.start_column == 0
+        assert elb_zone.end_column == 61  # Length of ELB LRD
+
+    def test_frontmatter_boundary_detection(self, service):
+        """Test that frontmatter boundaries are correctly detected and subsequent --- lines ignored."""
+        content = """---
+title: Test File
+id: 20250123000001
+---
+
+# Content
+
+Some content here.
+
+---
+
+This is a horizontal rule, not frontmatter.
+More content after the rule.
+"""
+
+        zones = service.extract_exclusion_zones(content)
+
+        # Should only have one frontmatter zone
+        frontmatter_zones = [z for z in zones if z.zone_type == "frontmatter"]
+        assert len(frontmatter_zones) == 1, (
+            f"Expected 1 frontmatter zone, got {len(frontmatter_zones)}"
+        )
+
+        zone = frontmatter_zones[0]
+        assert zone.start_line == 1
+        assert zone.end_line == 4  # Should end at the first closing ---
+
+    def test_alias_always_included(self, service, file_registry):
+        """Test that aliases are always included for better readability."""
+        file = file_registry["20230101120000"]  # Interface Design file
+        target_info = {
+            "text": "interface design",
+            "file_id": "20230101120000",
+            "source_type": "title",
+            "confidence": 1.0,
+            "original_text": "Interface Design",
+        }
+
+        # Test with exact title match - should still include alias
+        alias = service._determine_best_alias_with_japanese(
+            "Interface Design", file, target_info
+        )
+        assert alias == "Interface Design", (
+            "Should always include alias for readability"
+        )
+
+        # Test with alias match - should include the matched text as alias
+        alias = service._determine_best_alias_with_japanese(
+            "UI Design", file, target_info
+        )
+        assert alias == "UI Design", "Should use matched text as alias"
+
+    def test_multiple_lrds_on_same_line(self, service):
+        """Test handling of multiple LRDs on the same line."""
+        content = """---
+title: Test Multiple LRDs
+---
+
+# Content
+
+[20230727234718|EC2]: 20230727234718 "Title1" [20230730201034|ELB]: 20230730201034 "Title2"
+"""
+
+        zones = service.extract_exclusion_zones(content)
+
+        # Find LRD zones
+        lrd_zones = [z for z in zones if z.zone_type == "link_ref_def"]
+        assert len(lrd_zones) == 2, (
+            f"Expected 2 LRD zones on same line, got {len(lrd_zones)}"
+        )
+
+        # Verify both LRDs are on the same line but different columns
+        assert all(z.start_line == 7 for z in lrd_zones), (
+            "Both LRDs should be on line 7"
+        )
+        assert lrd_zones[0].start_column != lrd_zones[1].start_column, (
+            "LRDs should have different column positions"
+        )
