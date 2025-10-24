@@ -1,0 +1,11 @@
+---
+title: Test Frontmatter Protection
+image: "../../assets/images/svg/undraw/undraw_scrum_board.svg"
+tags: [tag1,tag2]
+id: 20240913221802
+publish: false
+---
+
+# Test Frontmatter Protection
+
+This file mentions Amazon API Gateway which should be linked.

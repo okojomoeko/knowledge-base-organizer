@@ -6,8 +6,8 @@ id: 20240520185933
 date: 2024-05-20
 publish: false
 publishDate: 2024-05-20
-coverSVG: "../images/svg/undraw/undraw_scrum_board.svg"
-image: "../images/svg/undraw/undraw_scrum_board.svg"
+coverSVG: ../images/svg/undraw/undraw_scrum_board.svg
+image: ../images/svg/undraw/undraw_scrum_board.svg
 socialImage: ../images/undraw/undraw_scrum_board.png
 description:
 categories: []
@@ -20,4 +20,4 @@ categories: []
 - [[webアプリ]]やブラウザなどのクライアントアプリとの間でデータを送受信する
 - [[html]]
 
-This document mentions [[20230730200042|Amazon API Gateway]] which should be linked.
+This document mentions AWS Organizations which should be linked.

@@ -18,8 +18,8 @@
         "category": "programming_languages",
         "subcategory": null,
         "description": "Python programming language",
-        "created_at": "2025-10-20 20:52:23.493752",
-        "updated_at": "2025-10-20 20:52:23.493760",
+        "created_at": "2025-10-24 22:34:05.622535",
+        "updated_at": "2025-10-24 22:34:05.622542",
         "usage_count": 0
       },
       "javascript": {
@@ -37,8 +37,8 @@
         "category": "programming_languages",
         "subcategory": null,
         "description": "JavaScript programming language",
-        "created_at": "2025-10-20 20:52:23.493764",
-        "updated_at": "2025-10-20 20:52:23.493764",
+        "created_at": "2025-10-24 22:34:05.622546",
+        "updated_at": "2025-10-24 22:34:05.622547",
         "usage_count": 0
       },
       "typescript": {
@@ -54,8 +54,8 @@
         "category": "programming_languages",
         "subcategory": null,
         "description": "TypeScript programming language",
-        "created_at": "2025-10-20 20:52:23.493767",
-        "updated_at": "2025-10-20 20:52:23.493767",
+        "created_at": "2025-10-24 22:34:05.622549",
+        "updated_at": "2025-10-24 22:34:05.622549",
         "usage_count": 0
       },
       "rust": {
@@ -71,8 +71,8 @@
         "category": "programming_languages",
         "subcategory": null,
         "description": "Rust programming language",
-        "created_at": "2025-10-20 20:52:23.493769",
-        "updated_at": "2025-10-20 20:52:23.493769",
+        "created_at": "2025-10-24 22:34:05.622551",
+        "updated_at": "2025-10-24 22:34:05.622552",
         "usage_count": 0
       },
       "go": {
@@ -88,8 +88,8 @@
         "category": "programming_languages",
         "subcategory": null,
         "description": "Go programming language",
-        "created_at": "2025-10-20 20:52:23.493772",
-        "updated_at": "2025-10-20 20:52:23.493772",
+        "created_at": "2025-10-24 22:34:05.622554",
+        "updated_at": "2025-10-24 22:34:05.622554",
         "usage_count": 0
       }
     }
@@ -112,8 +112,8 @@
         "category": "technologies",
         "subcategory": "database",
         "description": "Database technologies",
-        "created_at": "2025-10-20 20:52:23.493779",
-        "updated_at": "2025-10-20 20:52:23.493779",
+        "created_at": "2025-10-24 22:34:05.622560",
+        "updated_at": "2025-10-24 22:34:05.622561",
         "usage_count": 0
       },
       "cloud": {
@@ -130,8 +130,8 @@
         "category": "technologies",
         "subcategory": "cloud",
         "description": "Cloud technologies",
-        "created_at": "2025-10-20 20:52:23.493791",
-        "updated_at": "2025-10-20 20:52:23.493797",
+        "created_at": "2025-10-24 22:34:05.622563",
+        "updated_at": "2025-10-24 22:34:05.622563",
         "usage_count": 0
       },
       "frontend": {
@@ -148,8 +148,8 @@
         "category": "technologies",
         "subcategory": "frontend",
         "description": "Frontend technologies",
-        "created_at": "2025-10-20 20:52:23.493823",
-        "updated_at": "2025-10-20 20:52:23.493825",
+        "created_at": "2025-10-24 22:34:05.622565",
+        "updated_at": "2025-10-24 22:34:05.622565",
         "usage_count": 0
       },
       "backend": {
@@ -165,8 +165,8 @@
         "category": "technologies",
         "subcategory": "backend",
         "description": "Backend technologies",
-        "created_at": "2025-10-20 20:52:23.493832",
-        "updated_at": "2025-10-20 20:52:23.493833",
+        "created_at": "2025-10-24 22:34:05.622567",
+        "updated_at": "2025-10-24 22:34:05.622568",
         "usage_count": 0
       }
     }
@@ -188,8 +188,8 @@
         "category": "concepts",
         "subcategory": null,
         "description": "Software architecture concepts",
-        "created_at": "2025-10-20 20:52:23.493862",
-        "updated_at": "2025-10-20 20:52:23.493863",
+        "created_at": "2025-10-24 22:34:05.622572",
+        "updated_at": "2025-10-24 22:34:05.622572",
         "usage_count": 0
       },
       "algorithms": {
@@ -205,8 +205,8 @@
         "category": "concepts",
         "subcategory": null,
         "description": "Algorithms and data structures",
-        "created_at": "2025-10-20 20:52:23.493865",
-        "updated_at": "2025-10-20 20:52:23.493866",
+        "created_at": "2025-10-24 22:34:05.622574",
+        "updated_at": "2025-10-24 22:34:05.622574",
         "usage_count": 0
       },
       "testing": {
@@ -223,8 +223,8 @@
         "category": "concepts",
         "subcategory": null,
         "description": "Software testing concepts",
-        "created_at": "2025-10-20 20:52:23.493868",
-        "updated_at": "2025-10-20 20:52:23.493868",
+        "created_at": "2025-10-24 22:34:05.622576",
+        "updated_at": "2025-10-24 22:34:05.622577",
         "usage_count": 0
       }
     }
@@ -247,8 +247,8 @@
         "category": "japanese_content",
         "subcategory": null,
         "description": "Japanese language content",
-        "created_at": "2025-10-20 20:52:23.493873",
-        "updated_at": "2025-10-20 20:52:23.493873",
+        "created_at": "2025-10-24 22:34:05.622580",
+        "updated_at": "2025-10-24 22:34:05.622581",
         "usage_count": 0
       },
       "culture": {
@@ -265,8 +265,8 @@
         "category": "japanese_content",
         "subcategory": null,
         "description": "Japanese culture content",
-        "created_at": "2025-10-20 20:52:23.493875",
-        "updated_at": "2025-10-20 20:52:23.493875",
+        "created_at": "2025-10-24 22:34:05.622583",
+        "updated_at": "2025-10-24 22:34:05.622583",
         "usage_count": 0
       },
       "api": {
@@ -282,8 +282,8 @@
         "category": "japanese_content",
         "subcategory": null,
         "description": "API and interface related content",
-        "created_at": "2025-10-20 20:52:23.493877",
-        "updated_at": "2025-10-20 20:52:23.493877",
+        "created_at": "2025-10-24 22:34:05.622585",
+        "updated_at": "2025-10-24 22:34:05.622585",
         "usage_count": 0
       },
       "database": {
@@ -298,8 +298,8 @@
         "category": "japanese_content",
         "subcategory": null,
         "description": "Database related content",
-        "created_at": "2025-10-20 20:52:23.493879",
-        "updated_at": "2025-10-20 20:52:23.493880",
+        "created_at": "2025-10-24 22:34:05.622587",
+        "updated_at": "2025-10-24 22:34:05.622588",
         "usage_count": 0
       },
       "service": {
@@ -313,8 +313,8 @@
         "category": "japanese_content",
         "subcategory": null,
         "description": "Service related content",
-        "created_at": "2025-10-20 20:52:23.493882",
-        "updated_at": "2025-10-20 20:52:23.493882",
+        "created_at": "2025-10-24 22:34:05.622589",
+        "updated_at": "2025-10-24 22:34:05.622590",
         "usage_count": 0
       }
     }
