@@ -146,7 +146,10 @@ class LinkAnalysisService:
             "html_a_tag": re.compile(r"<a[^>]*>.*?</a>"),
             "inline_code": re.compile(r"`.*?`"),
             "wiki": re.compile(r"\[\[([^\]]+)\]\]"),
-            "regular_link": re.compile(r"\[([^\]]+)\]\(([^)]+)\)"),
+            # Improved pattern to handle nested brackets in link text
+            "regular_link": re.compile(
+                r"\[(?:[^\[\]]*(?:\[[^\]]*\][^\[\]]*)*)\]\([^)]+\)"
+            ),
             "link_ref": re.compile(
                 r"\[([^|\]]+)\|([^\]]+)\]:\s*([^\s]+)(?:\s+\"([^\"]+)\")?"
             ),
@@ -590,13 +593,15 @@ class LinkAnalysisService:
         for file_id, file in file_registry.items():
             # Add title as target
             if file.frontmatter.title:
-                enhanced_targets.append({
-                    "text": file.frontmatter.title.lower(),
-                    "file_id": file_id,
-                    "source_type": "title",
-                    "confidence": 1.0,
-                    "original_text": file.frontmatter.title,
-                })
+                enhanced_targets.append(
+                    {
+                        "text": file.frontmatter.title.lower(),
+                        "file_id": file_id,
+                        "source_type": "title",
+                        "confidence": 1.0,
+                        "original_text": file.frontmatter.title,
+                    }
+                )
 
                 # Add Japanese variations of title if Japanese processing is enabled
                 if self.japanese_enabled:
@@ -607,24 +612,28 @@ class LinkAnalysisService:
                     )
                     for variation in title_variations:
                         if variation.lower() != file.frontmatter.title.lower():
-                            enhanced_targets.append({
-                                "text": variation.lower(),
-                                "file_id": file_id,
-                                "source_type": "title_variation",
-                                "confidence": 0.9,
-                                "original_text": variation,
-                                "variation_of": file.frontmatter.title,
-                            })
+                            enhanced_targets.append(
+                                {
+                                    "text": variation.lower(),
+                                    "file_id": file_id,
+                                    "source_type": "title_variation",
+                                    "confidence": 0.9,
+                                    "original_text": variation,
+                                    "variation_of": file.frontmatter.title,
+                                }
+                            )
 
             # Add aliases as targets
             for alias in file.frontmatter.aliases:
-                enhanced_targets.append({
-                    "text": alias.lower(),
-                    "file_id": file_id,
-                    "source_type": "alias",
-                    "confidence": 1.0,
-                    "original_text": alias,
-                })
+                enhanced_targets.append(
+                    {
+                        "text": alias.lower(),
+                        "file_id": file_id,
+                        "source_type": "alias",
+                        "confidence": 1.0,
+                        "original_text": alias,
+                    }
+                )
 
                 # Add Japanese variations of aliases
                 if self.japanese_enabled:
@@ -633,14 +642,16 @@ class LinkAnalysisService:
                     )
                     for variation in alias_variations:
                         if variation.lower() != alias.lower():
-                            enhanced_targets.append({
-                                "text": variation.lower(),
-                                "file_id": file_id,
-                                "source_type": "alias_variation",
-                                "confidence": 0.9,
-                                "original_text": variation,
-                                "variation_of": alias,
-                            })
+                            enhanced_targets.append(
+                                {
+                                    "text": variation.lower(),
+                                    "file_id": file_id,
+                                    "source_type": "alias_variation",
+                                    "confidence": 0.9,
+                                    "original_text": variation,
+                                    "variation_of": alias,
+                                }
+                            )
 
         return enhanced_targets
 

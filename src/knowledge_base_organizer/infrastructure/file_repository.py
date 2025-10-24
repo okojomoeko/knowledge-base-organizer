@@ -263,6 +263,7 @@ class FileRepository:
         frontmatter_changes: dict[str, Any],
         *,
         backup: bool = True,
+        preserve_frontmatter: bool = False,
     ) -> None:
         """Update frontmatter fields in a file."""
         if backup and self.config.backup_enabled:
@@ -280,10 +281,25 @@ class FileRepository:
 
         # Reconstruct content with updated frontmatter
         if frontmatter_dict:
-            frontmatter_yaml = yaml.dump(
-                frontmatter_dict, default_flow_style=False, allow_unicode=True
-            )
-            full_content = f"---\n{frontmatter_yaml}---\n{current_file.content}"
+            if preserve_frontmatter:
+                # Use the same formatting approach as save_file
+                # Create a temporary MarkdownFile with updated frontmatter
+                updated_frontmatter = Frontmatter(**frontmatter_dict)
+                temp_file = MarkdownFile(
+                    path=current_file.path,
+                    file_id=current_file.file_id,
+                    frontmatter=updated_frontmatter,
+                    content=current_file.content,
+                )
+                full_content = self._reconstruct_content(
+                    temp_file, preserve_frontmatter=True
+                )
+            else:
+                # Use standard YAML dump (original behavior)
+                frontmatter_yaml = yaml.dump(
+                    frontmatter_dict, default_flow_style=False, allow_unicode=True
+                )
+                full_content = f"---\n{frontmatter_yaml}---\n{current_file.content}"
         else:
             full_content = current_file.content
 

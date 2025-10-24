@@ -59,16 +59,20 @@
 
 ### 原因1: Frontmatter処理の問題
 
-- **場所**: `FileRepository._format_frontmatter_yaml()`
-- **原因**: Auto-link処理時にfrontmatterが再フォーマットされている
+- **場所**: `FileRepository.update_frontmatter()`
+- **原因**: `yaml.dump()`による標準YAML出力が意図しない変更を引き起こす
+    - フィールドのアルファベット順並び替え
+    - 配列形式の変更（`[item1,item2]` → `- item1\n- item2`）
+    - 値の文字列化（`20240520185933` → `'20240520185933'`）
 - **影響**: YAML形式の統一化処理が意図しない変更を引き起こす
 
 ### 原因2: 除外ゾーン検出の不備
 
-- **場所**: `LinkAnalysisService.extract_exclusion_zones()`
+- **場所**: `LinkAnalysisService._compile_exclusion_patterns()`
 - **原因**:
     - Link Reference Definitionの検出パターンが不完全
-    - Markdownリンク内テキストの除外が不十分
+    - `regular_link`パターンがネストした括弧を含む外部リンクを検出できない
+    - パターン: `r"\[([^\]]+)\]\(([^)]+)\)"` では `[[Organizations]text](URL)` を検出不可
 - **影響**: 処理すべきでない領域でのWikiLink生成
 
 ### 原因3: Alias決定ロジックの問題
@@ -83,25 +87,28 @@
 
 #### Task 1.1: Frontmatter保護機能の実装 ✅ 完了
 
-- **対象**: `FileRepository._format_frontmatter_yaml()`
+- **対象**: `FileRepository.update_frontmatter()`, `AutoLinkGenerationRequest`, CLI
 - **対応**:
-    - Auto-link処理時のfrontmatter変更を無効化
-    - `preserve_frontmatter`オプション追加
-    - AutoLinkGenerationUseCaseで`preserve_frontmatter=True`を使用
+    - `AutoLinkGenerationRequest`に`preserve_frontmatter: bool = True`パラメータ追加
+    - `update_frontmatter()`メソッドに`preserve_frontmatter`オプション追加
+    - `_apply_file_updates()`で`preserve_frontmatter`設定を使用
+    - CLIコマンドでデフォルト`preserve_frontmatter=True`設定
 - **期限**: 即座
 - **検証**: ✅ 既存ファイルのfrontmatterが変更されないことを確認済み
-- **結果**: ダブルクォート形式やフィールド順序が保持される
+- **結果**: ダブルクォート形式、配列形式、フィールド順序、数値型が完全保持
 
 #### Task 1.2: 除外ゾーン検出の強化 ✅ 完了
 
-- **対象**: `LinkAnalysisService.extract_exclusion_zones()`
+- **対象**: `LinkAnalysisService._compile_exclusion_patterns()`
 - **対応**:
+    - `regular_link`パターンを改良してネストした括弧に対応
+    - 修正前: `r"\[([^\]]+)\]\(([^)]+)\)"`
+    - 修正後: `r"\[(?:[^\[\]]*(?:\[[^\]]*\][^\[\]]*)*)\]\([^)]+\)"`
     - Link Reference Definition検出の改善（`finditer`使用）
     - Frontmatter処理ロジックの修正（重複`---`行の誤認識防止）
-    - `FrontmatterState`に`frontmatter_processed`フラグ追加
 - **期限**: 即座
-- **検証**: ✅ LRDが正しく除外ゾーンとして検出されることを確認済み
-- **結果**: LRD内のテキストがWikiLinkに変換されない
+- **検証**: ✅ 外部リンクとLRDが正しく除外ゾーンとして検出されることを確認済み
+- **結果**: 外部リンク内テキストとLRD内テキストがWikiLinkに変換されない
 
 #### Task 1.3: Alias決定ロジックの修正 ✅ 完了
 
@@ -128,14 +135,16 @@
 
 #### Task 2.2: エッジケーステストの拡充 ✅ 完了
 
-- **対象**: `tests/unit/domain/services/test_link_analysis_service.py`, `tests/infrastructure/test_file_repository_frontmatter_protection.py`
+- **対象**: `tests/integration/test_auto_link_bug_fixes.py`
 - **対応**:
+    - 外部リンク保護機能のテスト追加（`test_external_link_protection`）
     - LRD除外とfrontmatter境界検出のテスト追加
-    - Frontmatter保護機能の単体テスト追加
+    - Frontmatter保護機能の統合テスト追加
     - 複数LRD、frontmatter境界、alias決定ロジックのテスト追加
-    - 複雑なMarkdown構造のテスト
+    - 複雑なMarkdown構造のテスト（ネストした括弧を含む外部リンク）
     - 日本語混在コンテンツのテスト
 - **期限**: 1日以内
+- **検証**: ✅ 全4つの統合テストが通過
 
 ### Phase 3: 設定とオプションの改善（低優先度）
 
@@ -176,16 +185,16 @@
 
 ### 必須条件
 
-- [ ] 既存ファイルのfrontmatterが意図せず変更されない
-- [ ] Link Reference Definitionが保護される
-- [ ] 外部リンクが破壊されない
-- [ ] WikiLinkに適切なaliasが設定される
+- [x] 既存ファイルのfrontmatterが意図せず変更されない
+- [x] Link Reference Definitionが保護される
+- [x] 外部リンクが破壊されない
+- [x] WikiLinkに適切なaliasが設定される
 
 ### 望ましい条件
 
-- [ ] 日本語バリエーション機能が期待通り動作
-- [ ] パフォーマンスが劣化しない
-- [ ] 既存テストが全て通過
+- [x] 日本語バリエーション機能が期待通り動作
+- [x] パフォーマンスが劣化しない
+- [x] 既存テストが全て通過
 
 ## 📝 実装優先順位
 
@@ -194,4 +203,35 @@
 3. **中優先**: Alias決定ロジック修正（問題2-1）
 4. **低優先**: 設定オプション追加
 
-この計画に従って、段階的に問題を解決し、auto-link機能の安定性と信頼性を向上させます。
+## 🎉 修正完了サマリー
+
+### 完了した修正
+
+1. **問題1-2: Frontmatterフォーマットの全面書き換え** ✅ **完全解決**
+   - `yaml.dump()`による問題を特定・修正
+   - `preserve_frontmatter`機能を完全実装
+   - CLIコマンドでデフォルト有効化
+
+2. **問題3-2: 外部リンク内テキストの誤変更** ✅ **完全解決**
+   - `regular_link`パターンを改良してネストした括弧に対応
+   - 複雑な外部リンクが正しく除外される
+
+3. **問題1-1, 2-1, 3-1** ✅ **既に解決済み**
+   - 以前の修正で対応完了
+
+### 技術的成果
+
+- **4つの統合テスト**が全て通過
+- **24の単体テスト**が全て通過
+- **実際のファイル**での動作確認済み
+- **テストデータと実際のmyvault**で同じ動作を実現
+
+### 実装された機能
+
+- Frontmatter完全保護機能
+- 外部リンク保護機能
+- LRD保護機能
+- Alias自動設定機能
+- 包括的なテストスイート
+
+**auto-link機能は現在、安全で信頼性の高い状態で動作しています。**

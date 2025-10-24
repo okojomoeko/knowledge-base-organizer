@@ -36,6 +36,7 @@ class AutoLinkGenerationRequest(BaseModel):
     exclude_content_patterns: list[str] | None = (
         None  # Content patterns to exclude from linking
     )
+    preserve_frontmatter: bool = True  # Preserve original frontmatter format
 
 
 class FileUpdate(BaseModel):
@@ -199,7 +200,7 @@ class AutoLinkGenerationUseCase:
 
         # 6. Apply updates if not dry-run
         if not request.dry_run:
-            self._apply_file_updates(file_updates)
+            self._apply_file_updates(file_updates, request.preserve_frontmatter)
 
         # 7. Generate summary
         summary = self._generate_summary(
@@ -319,7 +320,9 @@ class AutoLinkGenerationUseCase:
 
         return updates
 
-    def _apply_file_updates(self, file_updates: list[FileUpdate]) -> None:
+    def _apply_file_updates(
+        self, file_updates: list[FileUpdate], preserve_frontmatter: bool = True
+    ) -> None:
         """Apply file updates to the actual files."""
         for update in file_updates:
             try:
@@ -329,15 +332,20 @@ class AutoLinkGenerationUseCase:
                 if update.update_type == "add_wikilink" and update.new_content:
                     # Update the content of the MarkdownFile object
                     markdown_file.content = update.new_content
-                    # Save the entire file, preserving original frontmatter format
+                    # Save the entire file, using the preserve_frontmatter setting from request
                     self.file_repository.save_file(
-                        markdown_file, backup=True, preserve_frontmatter=True
+                        markdown_file,
+                        backup=True,
+                        preserve_frontmatter=preserve_frontmatter,
                     )
 
                 elif update.update_type == "add_alias" and update.frontmatter_changes:
-                    # Update frontmatter with new aliases
+                    # Update frontmatter with new aliases, using the preserve_frontmatter setting
                     self.file_repository.update_frontmatter(
-                        update.file_path, update.frontmatter_changes, backup=True
+                        update.file_path,
+                        update.frontmatter_changes,
+                        backup=True,
+                        preserve_frontmatter=preserve_frontmatter,
                     )
 
             except Exception as e:
@@ -371,18 +379,22 @@ class AutoLinkGenerationUseCase:
         )
 
         # Files with links added
-        files_with_links = len({
-            update.file_path
-            for update in file_updates
-            if update.update_type == "add_wikilink"
-        })
+        files_with_links = len(
+            {
+                update.file_path
+                for update in file_updates
+                if update.update_type == "add_wikilink"
+            }
+        )
 
         # Files with aliases added
-        files_with_aliases = len({
-            update.file_path
-            for update in file_updates
-            if update.update_type == "add_alias"
-        })
+        files_with_aliases = len(
+            {
+                update.file_path
+                for update in file_updates
+                if update.update_type == "add_alias"
+            }
+        )
 
         return {
             "files_processed": len(files_processed),

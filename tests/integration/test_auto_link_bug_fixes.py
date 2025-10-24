@@ -347,3 +347,105 @@ def test_lrd_exclusion(auto_link_use_case, lrd_exclusion_vault_path):
         "Amazon Elastic Compute Cloud ([[20230727234718|Amazon EC2]])"
         not in modified_content
     ), "LRD title should NOT be converted to WikiLinks"
+
+
+@pytest.fixture
+def external_link_protection_vault_path():
+    """Create a temporary vault to test external link protection."""
+    temp_dir = tempfile.mkdtemp()
+    vault_path = Path(temp_dir) / "external_link_vault"
+    vault_path.mkdir()
+
+    # File with external links that should be protected
+    source_content = """---
+title: Test External Link Protection
+id: 20250123000002
+tags: [test, external]
+---
+
+# Test External Link Protection
+
+This file mentions Organizations which should be linked in body text.
+
+But this external link should NOT be modified:
+[[Organizations]CloudWatchを別アカウントに共有する際にOrganization account selectorを使ってみた | DevelopersIO](https://dev.classmethod.jp/articles/cloudwatch-organizations-selector/)
+
+And this regular external link should also be protected:
+[AWS Organizations Documentation](https://docs.aws.amazon.com/organizations/)
+
+Organizations is mentioned again here and should be linked.
+"""
+
+    # Target file
+    organizations_content = """---
+title: AWS Organizations
+aliases: [Organizations, AWS Organizations]
+id: 20230709211042
+tags: [aws, management]
+---
+
+# AWS Organizations
+
+AWS Organizations is a service for managing multiple AWS accounts.
+"""
+
+    (vault_path / "source.md").write_text(source_content, encoding="utf-8")
+    (vault_path / "organizations.md").write_text(
+        organizations_content, encoding="utf-8"
+    )
+
+    yield vault_path
+    shutil.rmtree(temp_dir)
+
+
+def test_external_link_protection(
+    auto_link_use_case, external_link_protection_vault_path
+):
+    """Test that text within external links is not converted to WikiLinks."""
+    source_file_path = external_link_protection_vault_path / "source.md"
+
+    request = AutoLinkGenerationRequest(
+        vault_path=external_link_protection_vault_path,
+        dry_run=False,
+    )
+
+    # Execute the use case
+    result = auto_link_use_case.execute(request)
+
+    # Verify execution was successful
+    assert not result.errors, f"Execution failed with errors: {result.errors}"
+    assert (
+        result.total_links_created == 2
+    )  # Two mentions of Organizations in body text should be linked
+
+    # Read the modified content
+    modified_content = source_file_path.read_text(encoding="utf-8")
+
+    # Verify Organizations in body text was linked
+    assert "This file mentions [[20230709211042|Organizations]]" in modified_content, (
+        "Organizations in body text should be linked"
+    )
+    assert "[[20230709211042|Organizations]] is mentioned again" in modified_content, (
+        "Second mention of Organizations should be linked"
+    )
+
+    # Most importantly: verify external links are preserved and NOT modified
+    assert (
+        "[[Organizations]CloudWatchを別アカウントに共有する際にOrganization account selectorを使ってみた | DevelopersIO](https://dev.classmethod.jp/articles/cloudwatch-organizations-selector/)"
+        in modified_content
+    ), "External link with Organizations in text should be preserved exactly"
+
+    assert (
+        "[AWS Organizations Documentation](https://docs.aws.amazon.com/organizations/)"
+        in modified_content
+    ), "Regular external link should be preserved exactly"
+
+    # Verify that Organizations within external links was NOT converted
+    assert (
+        "[[[[20230709211042|Organizations]]]CloudWatchを別アカウントに"
+        not in modified_content
+    ), "Organizations within external link should NOT be converted to WikiLink"
+
+    assert (
+        "[[[20230709211042|AWS Organizations]] Documentation]" not in modified_content
+    ), "Organizations within regular external link should NOT be converted"
