@@ -8,6 +8,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from ..models import MarkdownFile, TextPosition, TextRange
+from .keyword_extraction_manager import KeywordExtractionManager
 from .tag_pattern_manager import TagPatternManager
 
 
@@ -77,6 +78,40 @@ class LinkDensityMetrics(BaseModel):
     unique_targets: int
 
 
+class OrphanedNote(BaseModel):
+    """Represents an orphaned note with connection suggestions."""
+
+    model_config = ConfigDict(
+        validate_assignment=True,
+        extra="forbid",
+    )
+
+    file_path: str
+    file_id: str
+    title: str | None
+    tags: list[str]
+    incoming_links: int
+    outgoing_links: int
+    connection_suggestions: list["ConnectionSuggestion"]
+    isolation_score: float  # 0.0 (well-connected) to 1.0 (completely isolated)
+
+
+class ConnectionSuggestion(BaseModel):
+    """Represents a suggested connection to another note."""
+
+    model_config = ConfigDict(
+        validate_assignment=True,
+        extra="forbid",
+    )
+
+    target_file_id: str
+    target_title: str | None
+    connection_type: str  # "tag_similarity", "keyword_match", "content_similarity"
+    confidence: float  # 0.0 to 1.0
+    reason: str
+    suggested_link_text: str | None = None
+
+
 class LinkAnalysisService:
     """Service for analyzing and processing links in markdown content."""
 
@@ -91,6 +126,8 @@ class LinkAnalysisService:
         # Initialize Japanese processing capabilities
         self.tag_pattern_manager = TagPatternManager(config_dir)
         self.japanese_enabled = True
+        # Initialize keyword extraction manager
+        self.keyword_manager = KeywordExtractionManager(config_dir)
 
     def extract_exclusion_zones(self, content: str) -> list[TextRange]:
         """Extract areas where auto-linking should be avoided.
@@ -593,13 +630,15 @@ class LinkAnalysisService:
         for file_id, file in file_registry.items():
             # Add title as target
             if file.frontmatter.title:
-                enhanced_targets.append({
-                    "text": file.frontmatter.title.lower(),
-                    "file_id": file_id,
-                    "source_type": "title",
-                    "confidence": 1.0,
-                    "original_text": file.frontmatter.title,
-                })
+                enhanced_targets.append(
+                    {
+                        "text": file.frontmatter.title.lower(),
+                        "file_id": file_id,
+                        "source_type": "title",
+                        "confidence": 1.0,
+                        "original_text": file.frontmatter.title,
+                    }
+                )
 
                 # Add Japanese variations of title if Japanese processing is enabled
                 if self.japanese_enabled:
@@ -610,24 +649,28 @@ class LinkAnalysisService:
                     )
                     for variation in title_variations:
                         if variation.lower() != file.frontmatter.title.lower():
-                            enhanced_targets.append({
-                                "text": variation.lower(),
-                                "file_id": file_id,
-                                "source_type": "title_variation",
-                                "confidence": 0.9,
-                                "original_text": variation,
-                                "variation_of": file.frontmatter.title,
-                            })
+                            enhanced_targets.append(
+                                {
+                                    "text": variation.lower(),
+                                    "file_id": file_id,
+                                    "source_type": "title_variation",
+                                    "confidence": 0.9,
+                                    "original_text": variation,
+                                    "variation_of": file.frontmatter.title,
+                                }
+                            )
 
             # Add aliases as targets
             for alias in file.frontmatter.aliases:
-                enhanced_targets.append({
-                    "text": alias.lower(),
-                    "file_id": file_id,
-                    "source_type": "alias",
-                    "confidence": 1.0,
-                    "original_text": alias,
-                })
+                enhanced_targets.append(
+                    {
+                        "text": alias.lower(),
+                        "file_id": file_id,
+                        "source_type": "alias",
+                        "confidence": 1.0,
+                        "original_text": alias,
+                    }
+                )
 
                 # Add Japanese variations of aliases
                 if self.japanese_enabled:
@@ -636,21 +679,23 @@ class LinkAnalysisService:
                     )
                     for variation in alias_variations:
                         if variation.lower() != alias.lower():
-                            enhanced_targets.append({
-                                "text": variation.lower(),
-                                "file_id": file_id,
-                                "source_type": "alias_variation",
-                                "confidence": 0.9,
-                                "original_text": variation,
-                                "variation_of": alias,
-                            })
+                            enhanced_targets.append(
+                                {
+                                    "text": variation.lower(),
+                                    "file_id": file_id,
+                                    "source_type": "alias_variation",
+                                    "confidence": 0.9,
+                                    "original_text": variation,
+                                    "variation_of": alias,
+                                }
+                            )
 
         return enhanced_targets
 
     def _determine_best_alias_with_japanese(
         self,
         matched_text: str,
-        target_file: MarkdownFile,
+        target_file: MarkdownFile,  # noqa: ARG002
         target_info: dict[str, Any],  # noqa: ARG002
     ) -> str | None:
         """Determine the best alias to use for a WikiLink with Japanese variations.
@@ -892,3 +937,390 @@ class LinkAnalysisService:
             )
 
         return analysis
+
+    def detect_orphaned_notes(self, files: list[MarkdownFile]) -> list[OrphanedNote]:
+        """Detect orphaned notes and suggest connections.
+
+        Args:
+            files: List of MarkdownFile objects to analyze
+
+        Returns:
+            List of OrphanedNote objects with connection suggestions
+        """
+        # Build file registry for analysis
+        file_registry = {
+            file.frontmatter.id: file for file in files if file.frontmatter.id
+        }
+
+        # Build link graph to identify incoming/outgoing links
+        link_graph = self._build_link_graph(files, file_registry)
+
+        orphaned_notes = []
+
+        for file in files:
+            file_id = file.frontmatter.id
+            if not file_id:
+                continue
+
+            # Count incoming and outgoing links
+            incoming_count = len(link_graph.get("incoming", {}).get(file_id, []))
+            outgoing_count = len(link_graph.get("outgoing", {}).get(file_id, []))
+
+            # Calculate isolation score (higher = more isolated)
+            isolation_score = self._calculate_isolation_score(
+                incoming_count, outgoing_count, len(files)
+            )
+
+            # Consider a note orphaned if it has very few connections
+            # and high isolation score
+            is_orphaned = (
+                (incoming_count + outgoing_count) <= 1 and isolation_score >= 0.7
+            ) or (incoming_count == 0 and outgoing_count == 0)
+
+            if is_orphaned:
+                # Generate connection suggestions
+                connection_suggestions = self._suggest_connections(
+                    file, files, file_registry, link_graph
+                )
+
+                orphaned_note = OrphanedNote(
+                    file_path=str(file.path),
+                    file_id=file_id,
+                    title=file.frontmatter.title,
+                    tags=file.frontmatter.tags or [],
+                    incoming_links=incoming_count,
+                    outgoing_links=outgoing_count,
+                    connection_suggestions=connection_suggestions,
+                    isolation_score=isolation_score,
+                )
+                orphaned_notes.append(orphaned_note)
+
+        # Sort by isolation score (most isolated first)
+        orphaned_notes.sort(key=lambda x: x.isolation_score, reverse=True)
+
+        return orphaned_notes
+
+    def _build_link_graph(
+        self, files: list[MarkdownFile], file_registry: dict[str, MarkdownFile]
+    ) -> dict[str, dict[str, list[str]]]:
+        """Build a graph of incoming and outgoing links between files."""
+        link_graph = {"incoming": {}, "outgoing": {}}
+
+        # Initialize all files in the graph
+        for file in files:
+            if file.frontmatter.id:
+                link_graph["incoming"][file.frontmatter.id] = []
+                link_graph["outgoing"][file.frontmatter.id] = []
+
+        # Process WikiLinks to build the graph
+        for file in files:
+            source_id = file.frontmatter.id
+            if not source_id:
+                continue
+
+            for wiki_link in file.wiki_links:
+                target_id = wiki_link.target_id
+                if target_id in file_registry:
+                    # Add outgoing link from source
+                    link_graph["outgoing"][source_id].append(target_id)
+                    # Add incoming link to target
+                    link_graph["incoming"][target_id].append(source_id)
+
+        return link_graph
+
+    def _calculate_isolation_score(
+        self, incoming_count: int, outgoing_count: int, total_files: int
+    ) -> float:
+        """Calculate isolation score for a note.
+
+        Args:
+            incoming_count: Number of incoming links
+            outgoing_count: Number of outgoing links
+            total_files: Total number of files in the vault
+
+        Returns:
+            Isolation score from 0.0 (well-connected) to 1.0 (completely isolated)
+        """
+        total_connections = incoming_count + outgoing_count
+
+        if total_connections == 0:
+            return 1.0  # Completely isolated
+
+        # Calculate expected connections based on vault size
+        # Larger vaults should have more connections per note
+        expected_connections = max(2, total_files * 0.05)  # 5% of vault size, min 2
+
+        # Normalize the connection count
+        connection_ratio = min(1.0, total_connections / expected_connections)
+
+        # Isolation score is inverse of connection ratio
+        return 1.0 - connection_ratio
+
+    def _suggest_connections(
+        self,
+        orphaned_file: MarkdownFile,
+        all_files: list[MarkdownFile],
+        file_registry: dict[str, MarkdownFile],  # noqa: ARG002
+        link_graph: dict[str, dict[str, list[str]]],
+    ) -> list[ConnectionSuggestion]:
+        """Suggest connections for an orphaned note.
+
+        Args:
+            orphaned_file: The orphaned file to find connections for
+            all_files: All files in the vault
+            file_registry: Registry of files by ID
+            link_graph: Graph of existing links
+
+        Returns:
+            List of ConnectionSuggestion objects
+        """
+        suggestions = []
+        orphaned_id = orphaned_file.frontmatter.id
+
+        if not orphaned_id:
+            return suggestions
+
+        # Get existing connections to avoid suggesting duplicates
+        existing_outgoing = set(link_graph["outgoing"].get(orphaned_id, []))
+
+        for candidate_file in all_files:
+            candidate_id = candidate_file.frontmatter.id
+            if not candidate_id or candidate_id == orphaned_id:
+                continue
+
+            # Skip if already connected
+            if candidate_id in existing_outgoing:
+                continue
+
+            # Check for tag similarity
+            tag_suggestion = self._check_tag_similarity(orphaned_file, candidate_file)
+            if tag_suggestion:
+                suggestions.append(tag_suggestion)
+
+            # Check for keyword matches in content
+            keyword_suggestion = self._check_keyword_similarity(
+                orphaned_file, candidate_file
+            )
+            if keyword_suggestion:
+                suggestions.append(keyword_suggestion)
+
+            # Check for title/alias matches
+            title_suggestion = self._check_title_similarity(
+                orphaned_file, candidate_file
+            )
+            if title_suggestion:
+                suggestions.append(title_suggestion)
+
+        # Sort by confidence and limit to top suggestions
+        suggestions.sort(key=lambda x: x.confidence, reverse=True)
+        return suggestions[:5]  # Limit to top 5 suggestions
+
+    def _check_tag_similarity(
+        self, orphaned_file: MarkdownFile, candidate_file: MarkdownFile
+    ) -> ConnectionSuggestion | None:
+        """Check for tag-based similarity between files."""
+        orphaned_tags = set(orphaned_file.frontmatter.tags or [])
+        candidate_tags = set(candidate_file.frontmatter.tags or [])
+
+        if not orphaned_tags or not candidate_tags:
+            return None
+
+        # Calculate tag overlap
+        common_tags = orphaned_tags.intersection(candidate_tags)
+        if not common_tags:
+            return None
+
+        # Calculate confidence based on tag overlap
+        total_unique_tags = len(orphaned_tags.union(candidate_tags))
+        confidence = (
+            len(common_tags) / total_unique_tags if total_unique_tags > 0 else 0
+        )
+
+        # Only suggest if confidence is reasonable
+        if confidence < 0.3:
+            return None
+
+        return ConnectionSuggestion(
+            target_file_id=candidate_file.frontmatter.id or "",
+            target_title=candidate_file.frontmatter.title,
+            connection_type="tag_similarity",
+            confidence=confidence,
+            reason=(
+                f"Shares {len(common_tags)} tag(s): {', '.join(sorted(common_tags))}"
+            ),
+            suggested_link_text=candidate_file.frontmatter.title,
+        )
+
+    def _check_keyword_similarity(
+        self, orphaned_file: MarkdownFile, candidate_file: MarkdownFile
+    ) -> ConnectionSuggestion | None:
+        """Check for keyword-based similarity between file contents."""
+        # Extract keywords from both files
+        orphaned_keywords = self._extract_keywords(orphaned_file.content)
+        candidate_keywords = self._extract_keywords(candidate_file.content)
+
+        if not orphaned_keywords or not candidate_keywords:
+            return None
+
+        # Find common keywords
+        common_keywords = orphaned_keywords.intersection(candidate_keywords)
+        if len(common_keywords) < 2:  # Require at least 2 common keywords
+            return None
+
+        # Calculate confidence based on keyword overlap
+        total_unique_keywords = len(orphaned_keywords.union(candidate_keywords))
+        confidence = (
+            len(common_keywords) / total_unique_keywords
+            if total_unique_keywords > 0
+            else 0
+        )
+
+        # Boost confidence for technical terms and proper nouns
+        technical_keywords = {
+            kw for kw in common_keywords if len(kw) > 4 and kw[0].isupper()
+        }
+        if technical_keywords:
+            confidence = min(1.0, confidence * 1.2)
+
+        # Only suggest if confidence is reasonable
+        if confidence < 0.2:
+            return None
+
+        return ConnectionSuggestion(
+            target_file_id=candidate_file.frontmatter.id or "",
+            target_title=candidate_file.frontmatter.title,
+            connection_type="keyword_match",
+            confidence=confidence,
+            reason=(
+                f"Shares {len(common_keywords)} keyword(s): "
+                f"{', '.join(sorted(list(common_keywords)[:3]))}"
+            ),
+            suggested_link_text=candidate_file.frontmatter.title,
+        )
+
+    def _check_title_similarity(
+        self, orphaned_file: MarkdownFile, candidate_file: MarkdownFile
+    ) -> ConnectionSuggestion | None:
+        """Check for title/alias similarity between files."""
+        orphaned_title = orphaned_file.frontmatter.title
+        candidate_title = candidate_file.frontmatter.title
+
+        if not orphaned_title or not candidate_title:
+            return None
+
+        # Check if orphaned file's title appears in candidate's content
+        candidate_content_lower = candidate_file.content.lower()
+        orphaned_title_lower = orphaned_title.lower()
+
+        # Look for title mentions in content
+        if orphaned_title_lower in candidate_content_lower:
+            # Calculate confidence based on how prominently the title appears
+            title_mentions = candidate_content_lower.count(orphaned_title_lower)
+            content_length = len(candidate_content_lower.split())
+            mention_density = (
+                title_mentions / content_length if content_length > 0 else 0
+            )
+
+            confidence = min(0.8, mention_density * 100)  # Scale and cap at 0.8
+
+            if confidence > 0.1:
+                return ConnectionSuggestion(
+                    target_file_id=candidate_file.frontmatter.id or "",
+                    target_title=candidate_file.frontmatter.title,
+                    connection_type="content_similarity",
+                    confidence=confidence,
+                    reason=(
+                        f"'{orphaned_title}' mentioned {title_mentions} "
+                        f"time(s) in content"
+                    ),
+                    suggested_link_text=orphaned_title,
+                )
+
+        # Check if candidate's title appears in orphaned file's content
+        orphaned_content_lower = orphaned_file.content.lower()
+        candidate_title_lower = candidate_title.lower()
+
+        if candidate_title_lower in orphaned_content_lower:
+            title_mentions = orphaned_content_lower.count(candidate_title_lower)
+            content_length = len(orphaned_content_lower.split())
+            mention_density = (
+                title_mentions / content_length if content_length > 0 else 0
+            )
+
+            confidence = min(0.8, mention_density * 100)
+
+            if confidence > 0.1:
+                return ConnectionSuggestion(
+                    target_file_id=candidate_file.frontmatter.id or "",
+                    target_title=candidate_file.frontmatter.title,
+                    connection_type="content_similarity",
+                    confidence=confidence,
+                    reason=(
+                        f"'{candidate_title}' mentioned {title_mentions} "
+                        f"time(s) in orphaned file"
+                    ),
+                    suggested_link_text=candidate_title,
+                )
+
+        return None
+
+    def _extract_keywords(self, content: str) -> set[str]:
+        """Extract meaningful keywords from content using configurable extraction.
+
+        Args:
+            content: The content to extract keywords from
+
+        Returns:
+            Set of keywords found in the content
+        """
+        return self.keyword_manager.extract_keywords(content)
+
+    def generate_auto_link_suggestions(
+        self, orphaned_notes: list[OrphanedNote]
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Generate automatic WikiLink creation suggestions for orphaned notes.
+
+        Args:
+            orphaned_notes: List of orphaned notes with connection suggestions
+
+        Returns:
+            Dictionary mapping file_id to list of auto-link suggestions
+        """
+        auto_link_suggestions = {}
+
+        for orphaned_note in orphaned_notes:
+            suggestions = []
+
+            # Convert high-confidence connection suggestions to auto-link suggestions
+            for connection in orphaned_note.connection_suggestions:
+                if connection.confidence >= 0.6:  # High confidence threshold
+                    suggestion = {
+                        "target_file_id": connection.target_file_id,
+                        "suggested_text": connection.suggested_link_text
+                        or connection.target_title,
+                        "confidence": connection.confidence,
+                        "reason": connection.reason,
+                        "connection_type": connection.connection_type,
+                        "auto_link_format": self._format_auto_link(
+                            connection.target_file_id,
+                            connection.suggested_link_text or connection.target_title,
+                        ),
+                    }
+                    suggestions.append(suggestion)
+
+            if suggestions:
+                auto_link_suggestions[orphaned_note.file_id] = suggestions
+
+        return auto_link_suggestions
+
+    def _format_auto_link(self, target_file_id: str, link_text: str) -> str:
+        """Format an auto-link in WikiLink format.
+
+        Args:
+            target_file_id: The target file ID
+            link_text: The text to display for the link
+
+        Returns:
+            Formatted WikiLink string
+        """
+        return f"[[{target_file_id}|{link_text}]]"

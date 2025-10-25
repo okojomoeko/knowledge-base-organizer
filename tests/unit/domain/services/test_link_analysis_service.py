@@ -27,6 +27,48 @@ class TestLinkAnalysisService:
         return LinkAnalysisService(config_dir=None)
 
     @pytest.fixture
+    def test_vault_path(self):
+        """Path to test vault with real data."""
+        return (
+            Path(__file__).parent.parent.parent.parent
+            / "test-data"
+            / "vaults"
+            / "test-myvault"
+        )
+
+    @pytest.fixture
+    def real_test_files(self, test_vault_path):
+        """Load real test files from test-myvault."""
+        from knowledge_base_organizer.infrastructure.config import Config
+        from knowledge_base_organizer.infrastructure.file_repository import (
+            FileRepository,
+        )
+
+        config = Config()
+        file_repo = FileRepository(config)
+        files = []
+
+        # Load specific test files that we know exist
+        test_file_paths = [
+            test_vault_path / "101_PermanentNotes" / "20230624175527.md",  # CloudWatch
+            test_vault_path
+            / "101_PermanentNotes"
+            / "20230709211042.md",  # AWS Organizations
+            test_vault_path / "101_PermanentNotes" / "20230730200042.md",  # API Gateway
+        ]
+
+        for file_path in test_file_paths:
+            if file_path.exists():
+                try:
+                    file = file_repo.load_file(file_path)
+                    files.append(file)
+                except Exception:
+                    # Skip files that can't be loaded
+                    pass
+
+        return files
+
+    @pytest.fixture
     def service_exclude_tables(self):
         """Create a LinkAnalysisService instance that excludes tables."""
         return LinkAnalysisService(exclude_tables=True, config_dir=None)
@@ -555,3 +597,559 @@ title: Test Multiple LRDs
         assert lrd_zones[0].start_column != lrd_zones[1].start_column, (
             "LRDs should have different column positions"
         )
+
+    def test_detect_orphaned_notes_completely_isolated(self, service):
+        """Test detection of completely isolated notes (no links)."""
+        # Create files with no links between them
+        orphaned_file = MarkdownFile(
+            path=Path("test.md"),
+            file_id="20230101120000",
+            frontmatter=Frontmatter(
+                title="Orphaned Note",
+                tags=["isolated"],
+                id="20230101120000",
+            ),
+            content="# Orphaned Note\n\nThis note has no connections.",
+        )
+
+        connected_file = MarkdownFile(
+            path=Path("test.md"),
+            file_id="20230101120001",
+            frontmatter=Frontmatter(
+                title="Connected Note",
+                tags=["connected"],
+                id="20230101120001",
+            ),
+            content="# Connected Note\n\nThis note mentions something.",
+        )
+
+        files = [orphaned_file, connected_file]
+        orphaned_notes = service.detect_orphaned_notes(files)
+
+        # Both files should be detected as orphaned since they have no connections
+        assert len(orphaned_notes) == 2
+
+        # Find the specific orphaned note
+        orphaned = next(n for n in orphaned_notes if n.file_id == "20230101120000")
+        assert orphaned.incoming_links == 0
+        assert orphaned.outgoing_links == 0
+        assert orphaned.isolation_score == 1.0  # Completely isolated
+
+    def test_detect_orphaned_notes_with_connections(self, service):
+        """Test that well-connected notes are not detected as orphaned."""
+        # Create files with links between them
+        source_file = MarkdownFile(
+            path=Path("test.md"),
+            file_id="20230101120000",
+            frontmatter=Frontmatter(
+                title="Source Note",
+                id="20230101120000",
+            ),
+            content="# Source Note\n\nThis links to [[20230101120001|Target Note]].",
+            wiki_links=[
+                WikiLink(
+                    target_id="20230101120001",
+                    alias="Target Note",
+                    line_number=3,
+                    column_start=17,
+                    column_end=45,
+                )
+            ],
+        )
+
+        target_file = MarkdownFile(
+            path=Path("test.md"),
+            file_id="20230101120001",
+            frontmatter=Frontmatter(
+                title="Target Note",
+                id="20230101120001",
+            ),
+            content="# Target Note\n\nThis is referenced by the source.",
+        )
+
+        files = [source_file, target_file]
+        orphaned_notes = service.detect_orphaned_notes(files)
+
+        # Neither file should be orphaned since they are connected
+        assert len(orphaned_notes) == 0
+
+    def test_suggest_connections_tag_similarity(self, service):
+        """Test connection suggestions based on tag similarity."""
+        orphaned_file = MarkdownFile(
+            path=Path("test.md"),
+            file_id="20230101120000",
+            frontmatter=Frontmatter(
+                title="Orphaned Note",
+                tags=["programming", "python"],
+                id="20230101120000",
+            ),
+            content="# Orphaned Note\n\nContent about programming.",
+        )
+
+        similar_file = MarkdownFile(
+            path=Path("test.md"),
+            file_id="20230101120001",
+            frontmatter=Frontmatter(
+                title="Similar Note",
+                tags=["programming", "javascript"],
+                id="20230101120001",
+            ),
+            content="# Similar Note\n\nContent about programming.",
+        )
+
+        different_file = MarkdownFile(
+            path=Path("test.md"),
+            file_id="20230101120002",
+            frontmatter=Frontmatter(
+                title="Different Note",
+                tags=["cooking", "recipes"],
+                id="20230101120002",
+            ),
+            content="# Different Note\n\nContent about cooking.",
+        )
+
+        files = [orphaned_file, similar_file, different_file]
+        file_registry = {f.frontmatter.id: f for f in files}
+        link_graph = {
+            "incoming": {f.frontmatter.id: [] for f in files},
+            "outgoing": {f.frontmatter.id: [] for f in files},
+        }
+
+        suggestions = service._suggest_connections(
+            orphaned_file, files, file_registry, link_graph
+        )
+
+        # Should suggest connection to similar_file based on shared "programming" tag
+        assert len(suggestions) >= 1
+        tag_suggestions = [
+            s for s in suggestions if s.connection_type == "tag_similarity"
+        ]
+        assert len(tag_suggestions) >= 1
+
+        tag_suggestion = tag_suggestions[0]
+        assert tag_suggestion.target_file_id == "20230101120001"
+        assert "programming" in tag_suggestion.reason
+
+    def test_suggest_connections_keyword_similarity(self, service):
+        """Test connection suggestions based on keyword similarity."""
+        orphaned_file = MarkdownFile(
+            path=Path("test.md"),
+            file_id="20230101120000",
+            frontmatter=Frontmatter(
+                title="Orphaned Note",
+                id="20230101120000",
+            ),
+            content="# Orphaned Note\n\nThis discusses Machine Learning algorithms and Neural Networks.",
+        )
+
+        similar_file = MarkdownFile(
+            path=Path("test.md"),
+            file_id="20230101120001",
+            frontmatter=Frontmatter(
+                title="Similar Note",
+                id="20230101120001",
+            ),
+            content="# Similar Note\n\nContent about Machine Learning and Deep Learning algorithms.",
+        )
+
+        files = [orphaned_file, similar_file]
+        file_registry = {f.frontmatter.id: f for f in files}
+        link_graph = {
+            "incoming": {f.frontmatter.id: [] for f in files},
+            "outgoing": {f.frontmatter.id: [] for f in files},
+        }
+
+        suggestions = service._suggest_connections(
+            orphaned_file, files, file_registry, link_graph
+        )
+
+        # Should suggest connection based on shared keywords
+        keyword_suggestions = [
+            s for s in suggestions if s.connection_type == "keyword_match"
+        ]
+        assert len(keyword_suggestions) >= 1
+
+        keyword_suggestion = keyword_suggestions[0]
+        assert keyword_suggestion.target_file_id == "20230101120001"
+        assert (
+            "Machine" in keyword_suggestion.reason
+            or "Learning" in keyword_suggestion.reason
+        )
+
+    def test_suggest_connections_title_mentions(self, service):
+        """Test connection suggestions based on title mentions in content."""
+        orphaned_file = MarkdownFile(
+            path=Path("test.md"),
+            file_id="20230101120000",
+            frontmatter=Frontmatter(
+                title="Orphaned Note",
+                id="20230101120000",
+            ),
+            content="# Orphaned Note\n\nThis note discusses Database Design patterns.",
+        )
+
+        mentioned_file = MarkdownFile(
+            path=Path("test.md"),
+            file_id="20230101120001",
+            frontmatter=Frontmatter(
+                title="Database Design",
+                id="20230101120001",
+            ),
+            content="# Database Design\n\nContent about database design.",
+        )
+
+        files = [orphaned_file, mentioned_file]
+        file_registry = {f.frontmatter.id: f for f in files}
+        link_graph = {
+            "incoming": {f.frontmatter.id: [] for f in files},
+            "outgoing": {f.frontmatter.id: [] for f in files},
+        }
+
+        suggestions = service._suggest_connections(
+            orphaned_file, files, file_registry, link_graph
+        )
+
+        # Should suggest connection based on title mention
+        content_suggestions = [
+            s for s in suggestions if s.connection_type == "content_similarity"
+        ]
+        assert len(content_suggestions) >= 1
+
+        content_suggestion = content_suggestions[0]
+        assert content_suggestion.target_file_id == "20230101120001"
+        assert "Database Design" in content_suggestion.reason
+
+    def test_generate_auto_link_suggestions(self, service):
+        """Test generation of auto-link suggestions for orphaned notes."""
+        # Create orphaned note with high-confidence connection suggestions
+        from knowledge_base_organizer.domain.services.link_analysis_service import (
+            ConnectionSuggestion,
+            OrphanedNote,
+        )
+
+        orphaned_note = OrphanedNote(
+            file_path="test.md",
+            file_id="20230101120000",
+            title="Orphaned Note",
+            tags=["test"],
+            incoming_links=0,
+            outgoing_links=0,
+            connection_suggestions=[
+                ConnectionSuggestion(
+                    target_file_id="20230101120001",
+                    target_title="Target Note",
+                    connection_type="tag_similarity",
+                    confidence=0.8,  # High confidence
+                    reason="Shares programming tag",
+                    suggested_link_text="Target Note",
+                ),
+                ConnectionSuggestion(
+                    target_file_id="20230101120002",
+                    target_title="Another Note",
+                    connection_type="keyword_match",
+                    confidence=0.4,  # Low confidence
+                    reason="Shares some keywords",
+                    suggested_link_text="Another Note",
+                ),
+            ],
+            isolation_score=1.0,
+        )
+
+        suggestions = service.generate_auto_link_suggestions([orphaned_note])
+
+        # Should only include high-confidence suggestions
+        assert "20230101120000" in suggestions
+        file_suggestions = suggestions["20230101120000"]
+        assert len(file_suggestions) == 1  # Only the high-confidence one
+
+        suggestion = file_suggestions[0]
+        assert suggestion["target_file_id"] == "20230101120001"
+        assert suggestion["confidence"] == 0.8
+        assert "[[20230101120001|Target Note]]" in suggestion["auto_link_format"]
+
+    def test_extract_keywords(self, service):
+        """Test keyword extraction from content."""
+        content = """---
+title: Test File
+---
+
+# Machine Learning Algorithms
+
+This document discusses various Machine Learning algorithms including
+Neural Networks, Decision Trees, and Support Vector Machines.
+The implementation uses Python and TensorFlow for deep learning.
+"""
+
+        keywords = service._extract_keywords(content)
+
+        # Should extract meaningful keywords
+        expected_keywords = {
+            "Machine",
+            "Learning",
+            "Algorithms",
+            "Neural",
+            "Networks",
+            "Decision",
+            "Trees",
+            "Support",
+            "Vector",
+            "Machines",
+            "Python",
+            "TensorFlow",
+            "deep",
+            "learning",
+        }
+
+        # Check that we found some of the expected keywords
+        found_keywords = keywords.intersection(expected_keywords)
+        assert len(found_keywords) >= 5, (
+            f"Expected at least 5 keywords, found: {found_keywords}"
+        )
+
+        # Should not include most common words (but "uses" might slip through as it's 4 chars)
+        very_common_words = {"the", "and", "for", "this"}
+        assert not keywords.intersection(very_common_words), (
+            "Should not include very common words"
+        )
+
+    def test_calculate_isolation_score(self, service):
+        """Test isolation score calculation."""
+        # Completely isolated note
+        score = service._calculate_isolation_score(0, 0, 100)
+        assert score == 1.0
+
+        # Well-connected note in large vault
+        score = service._calculate_isolation_score(5, 5, 100)
+        assert score < 0.5
+
+        # Moderately connected note (2 connections in 50-file vault)
+        # Expected connections = max(2, 50 * 0.05) = max(2, 2.5) = 2.5
+        # Connection ratio = 2 / 2.5 = 0.8
+        # Isolation score = 1.0 - 0.8 = 0.2
+        score = service._calculate_isolation_score(1, 1, 50)
+        assert 0.1 < score < 0.3  # Adjusted expected range
+
+    def test_detect_orphaned_notes_with_realistic_data(self, service):
+        """Test orphaned note detection with realistic test data."""
+        # Create realistic test files based on actual vault structure
+        cloudwatch_file = MarkdownFile(
+            path=Path("test.md"),
+            file_id="20230624175527",
+            frontmatter=Frontmatter(
+                title="Amazon CloudWatch",
+                aliases=["CloudWatch", "cloudwatch"],
+                tags=["aws", "monitoring"],
+                id="20230624175527",
+            ),
+            content="""# Amazon CloudWatch
+
+統合的な運用監視サービス
+
+## 機能
+- メトリクス監視
+- ログ管理
+- アラーム設定
+
+## ユースケース
+EC2、ELB、RDSなどで構成された3層構造のwebアプリケーションを考える。
+""",
+        )
+
+        organizations_file = MarkdownFile(
+            path=Path("test.md"),
+            file_id="20230709211042",
+            frontmatter=Frontmatter(
+                title="AWS Organizations",
+                aliases=["Organizations"],
+                id="20230709211042",
+            ),
+            content="# AWS Organizations\n\nAWS Organizations is a service for managing multiple AWS accounts.",
+        )
+
+        files = [cloudwatch_file, organizations_file]
+        orphaned_notes = service.detect_orphaned_notes(files)
+
+        # Both files should be detected as orphaned since they don't link to each other
+        assert len(orphaned_notes) == 2
+
+        # Check that orphaned notes have proper structure
+        for orphaned in orphaned_notes:
+            assert orphaned.file_id
+            assert orphaned.file_path
+            assert isinstance(orphaned.isolation_score, float)
+            assert 0.0 <= orphaned.isolation_score <= 1.0
+            assert isinstance(orphaned.connection_suggestions, list)
+
+    def test_keyword_extraction_with_real_data(self, service, real_test_files):
+        """Test keyword extraction with real markdown content."""
+        if not real_test_files:
+            pytest.skip("No real test files available")
+
+        # Test with CloudWatch file (should have technical keywords)
+        cloudwatch_file = next(
+            (f for f in real_test_files if "CloudWatch" in (f.frontmatter.title or "")),
+            None,
+        )
+
+        if cloudwatch_file:
+            keywords = service._extract_keywords(cloudwatch_file.content)
+
+            # Should extract technical terms from CloudWatch content
+            expected_technical_terms = {"CloudWatch", "AWS", "EC2", "ELB", "RDS"}
+            found_technical = keywords.intersection(expected_technical_terms)
+            assert len(found_technical) >= 2, (
+                f"Expected technical terms, found: {found_technical}"
+            )
+
+            # Should extract Japanese terms
+            expected_japanese = {"メトリクス", "アラーム", "ダッシュボード"}
+            found_japanese = keywords.intersection(expected_japanese)
+            assert len(found_japanese) >= 1, (
+                f"Expected Japanese terms, found: {found_japanese}"
+            )
+
+    def test_connection_suggestions_with_real_data(self, service, real_test_files):
+        """Test connection suggestions with real test data."""
+        if len(real_test_files) < 2:
+            pytest.skip("Need at least 2 real test files")
+
+        # Create a file registry
+        file_registry = {
+            f.frontmatter.id: f for f in real_test_files if f.frontmatter.id
+        }
+        link_graph = {"incoming": {}, "outgoing": {}}
+
+        # Initialize empty link graph
+        for file_id in file_registry:
+            link_graph["incoming"][file_id] = []
+            link_graph["outgoing"][file_id] = []
+
+        # Test suggestions for the first file
+        test_file = real_test_files[0]
+        suggestions = service._suggest_connections(
+            test_file, real_test_files, file_registry, link_graph
+        )
+
+        # Should generate some suggestions
+        assert isinstance(suggestions, list)
+
+        # Check suggestion structure
+        for suggestion in suggestions:
+            assert suggestion.target_file_id in file_registry
+            assert suggestion.connection_type in [
+                "tag_similarity",
+                "keyword_match",
+                "content_similarity",
+            ]
+            assert 0.0 <= suggestion.confidence <= 1.0
+            assert suggestion.reason
+
+    def test_keyword_extraction_configuration_loading(self, service):
+        """Test that keyword extraction manager loads configuration properly."""
+        # Test that the keyword manager is initialized
+        assert hasattr(service, "keyword_manager")
+        assert service.keyword_manager is not None
+
+        # Test basic keyword extraction
+        test_content = """
+        # Machine Learning and AI
+
+        This document discusses artificial intelligence, neural networks, and deep learning.
+        We also cover データベース and API design patterns.
+        """
+
+        keywords = service._extract_keywords(test_content)
+
+        # Should extract both English and Japanese keywords
+        assert len(keywords) > 0
+
+        # Should include technical terms
+        technical_terms = {"Machine", "Learning", "API", "neural", "networks"}
+        found_technical = keywords.intersection(technical_terms)
+        assert len(found_technical) >= 2, (
+            f"Expected technical terms, found: {found_technical}"
+        )
+
+    def test_keyword_extraction_with_japanese_content(self, service):
+        """Test keyword extraction with mixed Japanese and English content."""
+        japanese_content = """
+        # プログラミング言語とフレームワーク
+
+        このドキュメントでは、JavaScript、Python、React について説明します。
+        また、データベース設計やAPI開発についても触れます。
+        機械学習とディープラーニングの基礎概念も含まれています。
+        """
+
+        keywords = service._extract_keywords(japanese_content)
+
+        # Should extract Japanese keywords
+        expected_japanese = {
+            "プログラミング",
+            "データベース",
+            "機械学習",
+            "ディープラーニング",
+        }
+        found_japanese = keywords.intersection(expected_japanese)
+        assert len(found_japanese) >= 2, (
+            f"Expected Japanese keywords, found: {found_japanese}"
+        )
+
+        # Should extract English technical terms
+        expected_english = {"JavaScript", "Python", "React", "API"}
+        found_english = keywords.intersection(expected_english)
+        assert len(found_english) >= 2, (
+            f"Expected English keywords, found: {found_english}"
+        )
+
+    def test_orphaned_note_detection_with_mixed_connections(self, service):
+        """Test orphaned note detection with a mix of connected and isolated notes."""
+        # Create test files with some connections
+        connected_file1 = MarkdownFile(
+            path=Path("test.md"),
+            file_id="20230101120000",
+            frontmatter=Frontmatter(
+                title="Connected Note 1",
+                tags=["programming", "python"],
+                id="20230101120000",
+            ),
+            content="# Connected Note 1\n\nThis links to [[20230101120001|Connected Note 2]].",
+            wiki_links=[
+                WikiLink(
+                    target_id="20230101120001",
+                    alias="Connected Note 2",
+                    line_number=3,
+                    column_start=17,
+                    column_end=45,
+                )
+            ],
+        )
+
+        connected_file2 = MarkdownFile(
+            path=Path("test.md"),
+            file_id="20230101120001",
+            frontmatter=Frontmatter(
+                title="Connected Note 2",
+                tags=["programming", "javascript"],
+                id="20230101120001",
+            ),
+            content="# Connected Note 2\n\nThis is referenced by Connected Note 1.",
+        )
+
+        orphaned_file = MarkdownFile(
+            path=Path("test.md"),
+            file_id="20230101120002",
+            frontmatter=Frontmatter(
+                title="Orphaned Note",
+                tags=["isolated"],
+                id="20230101120002",
+            ),
+            content="# Orphaned Note\n\nThis note has no connections to other notes.",
+        )
+
+        files = [connected_file1, connected_file2, orphaned_file]
+        orphaned_notes = service.detect_orphaned_notes(files)
+
+        # Only the orphaned file should be detected
+        assert len(orphaned_notes) == 1
+        assert orphaned_notes[0].file_id == "20230101120002"
+        assert orphaned_notes[0].isolation_score > 0.5  # Should be highly isolated

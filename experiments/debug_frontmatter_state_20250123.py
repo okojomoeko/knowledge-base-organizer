@@ -9,7 +9,9 @@ import tempfile
 from pathlib import Path
 
 from knowledge_base_organizer.domain.services.link_analysis_service import (
-    FrontmatterState, LinkAnalysisService)
+    FrontmatterState,
+    LinkAnalysisService,
+)
 
 
 def debug_frontmatter_state():

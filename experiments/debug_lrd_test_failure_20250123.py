@@ -8,11 +8,11 @@
 import tempfile
 from pathlib import Path
 
-from knowledge_base_organizer.domain.services.link_analysis_service import \
-    LinkAnalysisService
+from knowledge_base_organizer.domain.services.link_analysis_service import (
+    LinkAnalysisService,
+)
 from knowledge_base_organizer.infrastructure.config import ProcessingConfig
-from knowledge_base_organizer.infrastructure.file_repository import \
-    FileRepository
+from knowledge_base_organizer.infrastructure.file_repository import FileRepository
 
 
 def debug_lrd_test_failure():
@@ -102,8 +102,7 @@ It also mentions EC2 and ELB which should NOT be linked because they appear in L
 
         # 実際のリンク候補検索をテスト
         # ダミーのfile_registryを作成
-        from knowledge_base_organizer.domain.models import (Frontmatter,
-                                                            MarkdownFile)
+        from knowledge_base_organizer.domain.models import Frontmatter, MarkdownFile
 
         ec2_file = MarkdownFile(
             path=Path("test.md"),

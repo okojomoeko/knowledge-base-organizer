@@ -8,11 +8,11 @@
 import tempfile
 from pathlib import Path
 
-from knowledge_base_organizer.domain.services.link_analysis_service import \
-    LinkAnalysisService
+from knowledge_base_organizer.domain.services.link_analysis_service import (
+    LinkAnalysisService,
+)
 from knowledge_base_organizer.infrastructure.config import ProcessingConfig
-from knowledge_base_organizer.infrastructure.file_repository import \
-    FileRepository
+from knowledge_base_organizer.infrastructure.file_repository import FileRepository
 
 
 def test_lrd_exclusion():

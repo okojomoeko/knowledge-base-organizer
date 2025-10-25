@@ -9,8 +9,9 @@ import re
 import tempfile
 from pathlib import Path
 
-from knowledge_base_organizer.domain.services.link_analysis_service import \
-    LinkAnalysisService
+from knowledge_base_organizer.domain.services.link_analysis_service import (
+    LinkAnalysisService,
+)
 
 
 def debug_exclusion_zone_detection():
