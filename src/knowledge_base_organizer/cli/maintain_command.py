@@ -325,7 +325,7 @@ def _run_orphan_detection(vault_path: Path, config: ProcessingConfig) -> dict[st
                     {
                         "file_path": str(file.path),
                         "file_id": file.file_id,
-                        "title": file.frontmatter.get("title", file.path.stem),
+                        "title": file.frontmatter.title or file.path.stem,
                         "content_length": len(file.content),
                         "suggested_connections": connection_suggestions[
                             :5
