@@ -648,6 +648,88 @@ def organize(
     )
 
 
+@app.command()
+def maintain(
+    vault_path: Path = typer.Argument(..., help="Path to Obsidian vault"),
+    dry_run: bool = typer.Option(
+        True, "--dry-run/--execute", help="Preview changes without applying them"
+    ),
+    interactive: bool = typer.Option(
+        False,
+        "--interactive",
+        "-i",
+        help="Interactive mode for reviewing maintenance tasks",
+    ),
+    output_format: str = typer.Option(
+        OutputFormat.CONSOLE, help="Output format (json, console)"
+    ),
+    include_patterns: list[str] | None = typer.Option(
+        None, "--include", help="Include file patterns"
+    ),
+    exclude_patterns: list[str] | None = typer.Option(
+        None, "--exclude", help="Exclude file patterns"
+    ),
+    output_file: Path | None = typer.Option(
+        None, "--output", "-o", help="Output file for maintenance report"
+    ),
+    create_backup: bool = typer.Option(
+        True, "--backup/--no-backup", help="Create backup before applying changes"
+    ),
+    schedule: str | None = typer.Option(
+        None, "--schedule", help="Schedule maintenance (daily, weekly, monthly)"
+    ),
+    maintenance_tasks: list[str] | None = typer.Option(
+        None,
+        "--task",
+        help="Specific maintenance tasks to run (organize, duplicates, orphans, dead-links)",
+    ),
+    duplicate_threshold: float = typer.Option(
+        0.7,
+        "--duplicate-threshold",
+        help="Similarity threshold for duplicate detection (0.0-1.0)",
+    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
+) -> None:
+    """Comprehensive vault maintenance with scheduling support.
+
+    This command performs comprehensive maintenance on your knowledge base including:
+    - Frontmatter organization and improvements
+    - Duplicate file detection and merge suggestions
+    - Orphaned note detection and connection suggestions
+    - Dead link detection and fix suggestions
+    - Comprehensive maintenance reporting
+
+    The command can be scheduled for regular execution and provides detailed
+    maintenance reports for tracking vault health over time.
+
+    Examples:
+        # Run full maintenance in dry-run mode
+        maintain /path/to/vault
+
+        # Execute specific maintenance tasks
+        maintain /path/to/vault --task organize --task duplicates --execute
+
+        # Schedule daily maintenance (placeholder for future implementation)
+        maintain /path/to/vault --schedule daily --execute
+    """
+    from .maintain_command import maintain_command
+
+    maintain_command(
+        vault_path=vault_path,
+        dry_run=dry_run,
+        interactive=interactive,
+        output_format=output_format,
+        include_patterns=include_patterns,
+        exclude_patterns=exclude_patterns,
+        output_file=output_file,
+        create_backup=create_backup,
+        schedule=schedule,
+        maintenance_tasks=maintenance_tasks,
+        duplicate_threshold=duplicate_threshold,
+        verbose=verbose,
+    )
+
+
 # @app.command()
 # def aggregate(...) -> None:
 #     """Aggregate notes based on criteria into single file."""
@@ -751,17 +833,19 @@ def _output_validation_results(
         # Prepare CSV output
         csv_data = []
         for r in result.results:
-            csv_data.append({
-                "file_path": str(r.file_path),
-                "template_type": r.template_type or "",
-                "is_valid": r.is_valid,
-                "missing_fields": "; ".join(r.missing_fields),
-                "invalid_fields": "; ".join([
-                    f"{k}: {v}" for k, v in r.invalid_fields.items()
-                ]),
-                "warnings": "; ".join(r.warnings),
-                "suggested_fixes_count": len(r.suggested_fixes),
-            })
+            csv_data.append(
+                {
+                    "file_path": str(r.file_path),
+                    "template_type": r.template_type or "",
+                    "is_valid": r.is_valid,
+                    "missing_fields": "; ".join(r.missing_fields),
+                    "invalid_fields": "; ".join(
+                        [f"{k}: {v}" for k, v in r.invalid_fields.items()]
+                    ),
+                    "warnings": "; ".join(r.warnings),
+                    "suggested_fixes_count": len(r.suggested_fixes),
+                }
+            )
 
         if output_file:
             with output_file.open("w", newline="", encoding="utf-8") as f:
@@ -1005,13 +1089,15 @@ def _filter_and_sort_dead_links(
     filtered_result.files_with_dead_links = len({dl.source_file for dl in dead_links})
 
     # Update summary
-    filtered_result.summary.update({
-        "total_dead_links": len(dead_links),
-        "files_with_dead_links": filtered_result.files_with_dead_links,
-        "wikilink_dead_links": dead_links_by_type.get("wikilink", 0),
-        "regular_link_dead_links": dead_links_by_type.get("regular_link", 0),
-        "link_ref_def_dead_links": dead_links_by_type.get("link_ref_def", 0),
-    })
+    filtered_result.summary.update(
+        {
+            "total_dead_links": len(dead_links),
+            "files_with_dead_links": filtered_result.files_with_dead_links,
+            "wikilink_dead_links": dead_links_by_type.get("wikilink", 0),
+            "regular_link_dead_links": dead_links_by_type.get("regular_link", 0),
+            "link_ref_def_dead_links": dead_links_by_type.get("link_ref_def", 0),
+        }
+    )
 
     return filtered_result
 
@@ -1059,14 +1145,16 @@ def _output_dead_link_results(
         # Prepare CSV output
         csv_data = []
         for dl in result.dead_links:
-            csv_data.append({
-                "source_file": dl.source_file,
-                "link_text": dl.link_text,
-                "link_type": dl.link_type,
-                "line_number": dl.line_number,
-                "target": dl.target,
-                "suggested_fixes": "; ".join(dl.suggested_fixes),
-            })
+            csv_data.append(
+                {
+                    "source_file": dl.source_file,
+                    "link_text": dl.link_text,
+                    "link_type": dl.link_type,
+                    "line_number": dl.line_number,
+                    "target": dl.target,
+                    "suggested_fixes": "; ".join(dl.suggested_fixes),
+                }
+            )
 
         if output_file:
             with output_file.open("w", newline="", encoding="utf-8") as f:
@@ -1183,16 +1271,18 @@ def _output_auto_link_results(
         # Prepare CSV output
         csv_data = []
         for update in result.file_updates:
-            csv_data.append({
-                "file_path": str(update.file_path),
-                "update_type": update.update_type,
-                "links_added": len(update.applied_replacements)
-                if update.applied_replacements
-                else 0,
-                "aliases_added": len(update.frontmatter_changes.get("aliases", []))
-                if update.frontmatter_changes
-                else 0,
-            })
+            csv_data.append(
+                {
+                    "file_path": str(update.file_path),
+                    "update_type": update.update_type,
+                    "links_added": len(update.applied_replacements)
+                    if update.applied_replacements
+                    else 0,
+                    "aliases_added": len(update.frontmatter_changes.get("aliases", []))
+                    if update.frontmatter_changes
+                    else 0,
+                }
+            )
 
         if output_file:
             with output_file.open("w", newline="", encoding="utf-8") as f:

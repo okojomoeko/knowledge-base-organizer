@@ -1324,3 +1324,89 @@ class LinkAnalysisService:
             Formatted WikiLink string
         """
         return f"[[{target_file_id}|{link_text}]]"
+
+    def suggest_connections_for_orphan(
+        self, orphaned_file: MarkdownFile, all_files: list[MarkdownFile]
+    ) -> list[dict[str, Any]]:
+        """Suggest connections for an orphaned file.
+
+        This is a simplified version of the connection suggestion logic
+        used by the maintain command.
+
+        Args:
+            orphaned_file: The orphaned file to find connections for
+            all_files: All files in the vault to consider for connections
+
+        Returns:
+            List of connection suggestions as dictionaries
+        """
+        suggestions = []
+        orphaned_tags = set(orphaned_file.frontmatter.tags or [])
+        orphaned_title = orphaned_file.frontmatter.title or orphaned_file.path.stem
+
+        # Extract keywords from orphaned file content
+        orphaned_keywords = self._extract_keywords(orphaned_file.content)
+
+        for candidate_file in all_files[:50]:  # Limit for performance
+            if candidate_file.path == orphaned_file.path:
+                continue
+
+            candidate_tags = set(candidate_file.frontmatter.tags or [])
+            candidate_title = (
+                candidate_file.frontmatter.title or candidate_file.path.stem
+            )
+
+            # Check tag similarity
+            common_tags = orphaned_tags & candidate_tags
+            if common_tags:
+                suggestions.append(
+                    {
+                        "target_file": str(candidate_file.path),
+                        "target_title": candidate_title,
+                        "connection_type": "tag_similarity",
+                        "confidence": min(
+                            1.0, len(common_tags) / max(len(orphaned_tags), 1)
+                        ),
+                        "reason": f"Shares tags: {', '.join(common_tags)}",
+                    }
+                )
+
+            # Check keyword matches
+            candidate_keywords = self._extract_keywords(candidate_file.content)
+            common_keywords = orphaned_keywords & candidate_keywords
+            if len(common_keywords) >= 2:  # At least 2 common keywords
+                suggestions.append(
+                    {
+                        "target_file": str(candidate_file.path),
+                        "target_title": candidate_title,
+                        "connection_type": "keyword_match",
+                        "confidence": min(
+                            1.0, len(common_keywords) / max(len(orphaned_keywords), 1)
+                        ),
+                        "reason": (
+                            f"Common keywords: {', '.join(list(common_keywords)[:3])}"
+                        ),
+                    }
+                )
+
+            # Check title similarity (simple string matching)
+            if (
+                orphaned_title.lower() in candidate_title.lower()
+                or candidate_title.lower() in orphaned_title.lower()
+            ):
+                suggestions.append(
+                    {
+                        "target_file": str(candidate_file.path),
+                        "target_title": candidate_title,
+                        "connection_type": "title_similarity",
+                        "confidence": 0.8,
+                        "reason": (
+                            f"Similar titles: '{orphaned_title}' and "
+                            f"'{candidate_title}'"
+                        ),
+                    }
+                )
+
+        # Sort by confidence and return top suggestions
+        suggestions.sort(key=lambda x: x["confidence"], reverse=True)
+        return suggestions[:5]  # Return top 5 suggestions

@@ -499,7 +499,7 @@
         - _Requirements: 20.4_
         - _既存コード拡張: LinkAnalysisService.py 約40行追加_
 
-    - [ ] 13.3 maintainコマンドの実装
+    - [x] 13.3 maintainコマンドの実装
         - 既存のorganizeコマンドを拡張してmaintain機能追加
         - 包括的メンテナンスレポート
         - スケジュール実行対応
