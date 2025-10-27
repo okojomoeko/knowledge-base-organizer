@@ -507,34 +507,57 @@
         - _Requirements: 20.7_
         - _既存コード拡張: organize_command.py 約50行追加_
 
-## Phase 15: ollama/LLM活用セマンティック分析 (長期・軽量)
+## Phase 15: ollama/LLM活用セマンティック分析 (高優先 - AI基盤)
 
-**理由**: ollama + local LLMを活用することで、重い依存関係なしでセマンティック分析が可能。
+**理由**: ollama + local LLMを活用することで、重い依存関係なしでセマンティック分析が可能。健全性確保 (Phase 13) の次に着手すべき、創発促進 (Phase 16以降) のための最重要基盤。
 
 - [ ] 15. ollama統合セマンティック分析サービス
-    - [ ] 15.1 ollama連携基盤の構築
-        - OllamaServiceクラス新規作成（HTTP API経由）
-        - 軽量なembedding生成（ollama/nomic-embed-text使用）
-        - シンプルなキャッシュシステム（JSON/pickle）
-        - **依存関係**: requests（既存）のみ
-        - _Requirements: 13.1, 13.2_
-        - _既存コード拡張: 新規サービス約100行_
+    - [ ] **15.1 AIサービス基盤の構築 (戦略1: Embedding + 戦略2: LLM)**
+        - [ ] **15.1.1 インターフェース定義 (Domain層)**
+            - `domain/services/ai_services.py` に `EmbeddingService`, `VectorStore`, `LLMService` のABCインターフェースを定義する (design.md 参照)。
+            - _Requirements: 13.1, 13.2, 17.1, 23.1_
+        - [ ] **15.1.2 OllamaEmbeddingService 実装 (Infrastructure層)**
+            - `infrastructure/ollama_embedding.py` を作成。
+            - `EmbeddingService` を実装し、`ollama/nomic-embed-text` を呼び出しベクトルを生成する。
+            - **依存関係**: `requests` (既存)
+            - _Requirements: 13.1, 13.2_
+        - [ ] **15.1.3 FaissVectorStore 実装 (Infrastructure層)**
+            - `infrastructure/faiss_vector_store.py` を作成。
+            - `VectorStore` を実装し、`faiss-cpu` を使ってインデックスをメモリ上およびファイル (`.kbo_index/vault.index`) に保存・ロードする。
+            - **依存関係**: `faiss-cpu` (新規追加)
+            - _Requirements: 13.1, 13.2, 18.1_
+        - [ ] **15.1.4 OllamaLLMService 実装 (Infrastructure層)**
+            - `infrastructure/ollama_llm.py` を作成。
+            - `LLMService` を実装し、`ollama/llama3.2:3b` (または設定されたモデル) の `generate` APIを呼び出す。
+            - `suggest_metadata`, `summarize`, `analyze_logical_relationship` 等の具体的なメソッドを実装する (design.md 参照)。
+            - **依存関係**: `requests` (既存)
+            - _Requirements: 17.1, 17.2, 23.1, 24.1_
+        - [ ] **15.1.5 DIコンテナの更新**
+            - CLI層（または設定ファイル）で、使用する具象クラス（Ollama/Faiss）をユースケースに注入 (DI) する設定を追加する。
 
-    - [ ] 15.2 LLMベースコンテンツ分析
-        - ollama/llama3.2:3bを使った関連性分析
-        - プロンプトベースの類似ノート発見
-        - 自然言語での関係性説明生成
-        - **依存関係**: ollama（ローカルインストール）
-        - _Requirements: 18.1, 18.2, 21.1_
-        - _既存コード拡張: 新規分析サービス約80行_
+    - [ ] **15.2 RAG基盤 (Vector DB) のユースケース実装**
+        - [ ] **15.2.1 `index` コマンドの新規実装 (CLI層)**
+            - `cli/index_command.py` を作成。
+            - ボルト全体をスキャンし、`EmbeddingService` でベクトル化、`VectorStore` に登録し、インデックスファイルを保存するユースケースを実装する。
+            - _Requirements: 13.1, 18.1_
+        - [ ] **15.2.2 `auto-link` コマンドのセマンティック強化 (Application層)**
+            - `auto-link` に `--semantic` オプションを追加。
+            - `AutoLinkGenerationUseCase` を修正し、`VectorStore.search` を呼び出して意味的に類似したノートを候補に追加するロジックを実装する。
+            - _Requirements: 13.1, 13.2, 13.3, 14.1, 21.1_
+        - [ ] **15.2.3 (オプション) `ask` コマンドの新規実装 (RAG)**
+            - `cli/ask_command.py` を作成。
+            - 質問文をベクトル化 → `VectorStore.search` で関連ノート検索 → `LLMService` にコンテキストとして渡し回答を生成させるユースケース (RAG) を実装する。
+            - _Requirements: 18.1, 18.2, 21.1_
 
-    - [ ] 15.3 セマンティック機能のCLI統合
-        - auto-linkコマンドに--semantic-modeオプション追加
-        - discover-relationshipsコマンド実装
-        - LLM分析結果の可視化
-        - **依存関係**: なし（上記サービス活用）
-        - _Requirements: 13.3, 18.7, 21.7_
-        - _既存コード拡張: CLI約60行追加_
+    - [ ] **15.3 オンデマンドLLMのユースケース実装**
+        - [ ] **15.3.1 `organize` コマンドのAI強化 (Application層)**
+            - `organize` に `--ai-suggest-metadata` オプションを追加。
+            - `FrontmatterEnhancementService` (または関連UseCase) を修正し、`LLMService.suggest_metadata` を呼び出し、タグやエイリアス、説明文を提案させる。
+            - _Requirements: 17.1, 17.2, 17.5, 23.1, 23.2_
+        - [ ] **15.3.2 `summarize` コマンドの新規実装 (CLI層)**
+            - `cli/summarize_command.py` を作成。
+            - 指定されたファイルの要約を `LLMService.summarize` で生成するユースケースを実装する。
+            - _Requirements: 17.2_
 
 ## Phase 16: 自動メンテナンスシステム (長期)
 

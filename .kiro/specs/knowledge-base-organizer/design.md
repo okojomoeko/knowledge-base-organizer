@@ -1570,60 +1570,141 @@ dependencies = [
 
 この段階的アプローチにより、既存の安定した機能を保持しながら、高度なAI機能を段階的に追加できます。
 
-## 🚀 修正された実装戦略
+## 🚀 Phase 15: ollama/LLM活用AI基盤 (高優先・軽量)
 
-### Phase 12: 日本語処理強化 (最優先・軽量)
+### 戦略1: Vector DB (RAG基盤) + 戦略2: オンデマンドLLM
 
-**理由**: 既存の基本的な日本語処理を拡張するだけで大幅な機能向上が可能。重い依存関係不要。
+**理由**: ollama + faiss-cpuによる軽量AI基盤で、重い依存関係なしでセマンティック分析とLLM推論を実現。
+
+### AI Services Domain Interface
 
 ```python
-# 既存のTagPatternManagerを拡張
-class TagPatternManager:
-    def __init__(self, config_dir: Path = None):
-        # 既存の初期化
-        self.japanese_variations = self._load_japanese_patterns()  # 新規追加
+# src/knowledge_base_organizer/domain/services/ai_services.py
+from abc import ABC, abstractmethod
+from typing import List, Tuple, Dict, Any
 
-    def find_japanese_variations(self, text: str) -> list[str]:
-        """日本語バリエーションを検出（軽量実装）"""
-        variations = []
-        # カタカナ表記ゆれ処理（純粋Python）
-        if 'ー' in text:
-            variations.append(text.replace('ー', ''))  # インターフェース → インターフェイス
-        if 'ヴ' in text:
-            variations.append(text.replace('ヴ', 'ブ'))  # サーヴィス → サービス
-        return variations
+class EmbeddingService(ABC):
+    """テキストをベクトル化するサービス"""
+    @abstractmethod
+    def create_embedding(self, text: str) -> List[float]:
+        pass
+
+class VectorStore(ABC):
+    """ベクトルを保存・検索する組み込み型サービス"""
+    @abstractmethod
+    def index_document(self, doc_id: str, vector: List[float]):
+        pass
+
+    @abstractmethod
+    def search(self, query_vector: List[float], k: int) -> List[Tuple[str, float]]:
+        pass
+
+    @abstractmethod
+    def save(self, path: str):
+        pass
+
+    @abstractmethod
+    def load(self, path: str):
+        pass
+
+class LLMService(ABC):
+    """オンデマンドでLLM推論を実行するサービス"""
+    @abstractmethod
+    def suggest_metadata(self, content: str) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def summarize(self, content: str) -> str:
+        pass
+
+    @abstractmethod
+    def analyze_logical_relationship(
+        self,
+        content_a: str,
+        content_b: str
+    ) -> Dict[str, Any]:
+        pass
 ```
 
-### Phase 15: ollama活用セマンティック分析 (長期・軽量)
-
-**ollama + local LLMアプローチ:**
+### Infrastructure Layer Implementation
 
 ```python
-# 新規: ollama連携サービス（軽量・依存関係最小）
-class OllamaSemanticService:
-    def __init__(self, base_url: str = "http://localhost:11434"):
+# src/infrastructure/ollama_embedding.py
+import requests
+from knowledge_base_organizer.domain.services.ai_services import EmbeddingService
+
+class OllamaEmbeddingService(EmbeddingService):
+    def __init__(self, base_url: str = "http://localhost:11434", model: str = "nomic-embed-text"):
         self.base_url = base_url
-        self.embedding_model = "nomic-embed-text"
-        self.chat_model = "llama3.2:3b"
+        self.model = model
 
-    def analyze_relationship(self, text1: str, text2: str) -> dict:
-        """LLMで関係性分析"""
-        import requests
-        prompt = f"""
-        以下の2つのテキストの関係性を分析してください：
-
-        テキスト1: {text1[:200]}...
-        テキスト2: {text2[:200]}...
-
-        関係性スコア（0-1）と理由を簡潔に回答してください。
-        """
-
-        response = requests.post(f"{self.base_url}/api/generate", json={
-            "model": self.chat_model,
-            "prompt": prompt,
-            "stream": False
+    def create_embedding(self, text: str) -> List[float]:
+        response = requests.post(f"{self.base_url}/api/embeddings", json={
+            "model": self.model,
+            "prompt": text
         })
-        return {"score": 0.8, "reason": response.json()["response"]}
+        response.raise_for_status()
+        return response.json()["embedding"]
+
+# src/infrastructure/faiss_vector_store.py
+import faiss
+import numpy as np
+from knowledge_base_organizer.domain.services.ai_services import VectorStore
+
+class FaissVectorStore(VectorStore):
+    def __init__(self, dimension: int = 768):
+        self.index = faiss.IndexFlatL2(dimension)
+        self.doc_id_map: List[str] = []
+
+    def index_document(self, doc_id: str, vector: List[float]):
+        self.index.add(np.array([vector], dtype=np.float32))
+        self.doc_id_map.append(doc_id)
+
+    def search(self, query_vector: List[float], k: int) -> List[Tuple[str, float]]:
+        D, I = self.index.search(np.array([query_vector], dtype=np.float32), k)
+        results = []
+        for i, dist in zip(I[0], D[0]):
+            if i != -1:
+                results.append((self.doc_id_map[i], float(dist)))
+        return results
+
+# src/infrastructure/ollama_llm.py
+class OllamaLLMService(LLMService):
+    def __init__(self, base_url: str = "http://localhost:11434", model: str = "llama3.2:3b"):
+        self.base_url = base_url
+        self.model = model
+
+    def suggest_metadata(self, content: str) -> Dict[str, Any]:
+        prompt = f"""
+        以下のノート内容に基づき、適切なメタデータをJSON形式で提案してください。
+        - tags: 3-5個の関連タグ
+        - aliases: 2-3個の代替名
+        - description: 1文の簡潔な説明
+
+        ノート内容:
+        {content[:1500]}...
+        """
+        response_str = self._call_llm(prompt, format="json")
+        try:
+            return json.loads(response_str)
+        except json.JSONDecodeError:
+            return {}
+
+    def analyze_logical_relationship(self, content_a: str, content_b: str) -> Dict[str, Any]:
+        prompt = f"""
+        以下の2つのノートの論理的関係性を分析してください。
+        関係性タイプ: PREMISE, DETAIL, EXAMPLE, CONTRADICTION, ELABORATION, NONE
+
+        ノートA: {content_a[:300]}...
+        ノートB: {content_b[:300]}...
+
+        JSON出力:
+        """
+        response_str = self._call_llm(prompt, format="json")
+        try:
+            return json.loads(response_str)
+        except json.JSONDecodeError:
+            return {}
 ```
 
 ### 依存関係の最小化
@@ -1637,14 +1718,16 @@ dependencies = [
     "rich>=13.0.0",
     "pyyaml>=6.0.0",
     "requests>=2.31.0",  # ollama API用（既存）
-    # Phase 15でollama使用（外部インストール）
-    # 重い依存関係は不要！
+
+    # Phase 15で追加
+    "faiss-cpu>=1.7.4",  # 軽量Vector DB用
+    # sentence-transformers は Ollama の embedding を使うため不要
 ]
 
 # 外部要件（ユーザーがインストール）
 # ollama install
-# ollama pull nomic-embed-text
-# ollama pull llama3.2:3b
+# ollama pull nomic-embed-text  (Embedding用)
+# ollama pull llama3.2:3b     (LLM推論用)
 ```
 
 ### 実装の利点
@@ -1654,8 +1737,9 @@ dependencies = [
 3. **ローカル**: プライバシー保護、オフライン動作
 4. **段階的**: ollama未インストール時は基本機能のみ動作
 5. **コスト効率**: 外部API不要
+6. **アーキテクチャ整合性**: 既存のDDDパターンに完全準拠
 
-この修正されたアプローチにより、既存の安定した機能を保持しながら、軽量で実用的なAI機能を段階的に追加できます。
+この軽量アプローチにより、既存の安定した機能を保持しながら、実用的なAI機能を段階的に追加できます。
 
 ## 🎯 LYT思想とMOC構築支援アーキテクチャ
 
