@@ -532,7 +532,7 @@
             - `suggest_metadata`, `summarize`, `analyze_logical_relationship` 等の具体的なメソッドを実装する (design.md 参照)。
             - **依存関係**: `requests` (既存)
             - _Requirements: 17.1, 17.2, 23.1, 24.1_
-        - [ ] **15.1.5 DIコンテナの更新**
+        - [x] **15.1.5 DIコンテナの更新**
             - CLI層（または設定ファイル）で、使用する具象クラス（Ollama/Faiss）をユースケースに注入 (DI) する設定を追加する。
 
     - [ ] **15.2 RAG基盤 (Vector DB) のユースケース実装**

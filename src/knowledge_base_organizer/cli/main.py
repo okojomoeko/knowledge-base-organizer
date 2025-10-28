@@ -62,6 +62,14 @@ try:
 except ImportError:
     pass  # Tag management not available
 
+# Import and add AI services subcommand
+try:
+    from .ai_command import app as ai_command_app
+
+    app.add_typer(ai_command_app, name="ai")
+except ImportError:
+    pass  # AI services not available
+
 
 @app.command()
 def analyze(
