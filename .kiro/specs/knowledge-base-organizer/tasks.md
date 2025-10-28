@@ -513,10 +513,10 @@
 
 - [ ] 15. ollama統合セマンティック分析サービス
     - [ ] **15.1 AIサービス基盤の構築 (戦略1: Embedding + 戦略2: LLM)**
-        - [ ] **15.1.1 インターフェース定義 (Domain層)**
+        - [x] **15.1.1 インターフェース定義 (Domain層)**
             - `domain/services/ai_services.py` に `EmbeddingService`, `VectorStore`, `LLMService` のABCインターフェースを定義する (design.md 参照)。
             - _Requirements: 13.1, 13.2, 17.1, 23.1_
-        - [ ] **15.1.2 OllamaEmbeddingService 実装 (Infrastructure層)**
+        - [x] **15.1.2 OllamaEmbeddingService 実装 (Infrastructure層)**
             - `infrastructure/ollama_embedding.py` を作成。
             - `EmbeddingService` を実装し、`ollama/nomic-embed-text` を呼び出しベクトルを生成する。
             - **依存関係**: `requests` (既存)
