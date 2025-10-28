@@ -526,7 +526,7 @@
             - `VectorStore` を実装し、`faiss-cpu` を使ってインデックスをメモリ上およびファイル (`.kbo_index/vault.index`) に保存・ロードする。
             - **依存関係**: `faiss-cpu` (新規追加)
             - _Requirements: 13.1, 13.2, 18.1_
-        - [ ] **15.1.4 OllamaLLMService 実装 (Infrastructure層)**
+        - [x] **15.1.4 OllamaLLMService 実装 (Infrastructure層)**
             - `infrastructure/ollama_llm.py` を作成。
             - `LLMService` を実装し、`ollama/llama3.2:3b` (または設定されたモデル) の `generate` APIを呼び出す。
             - `suggest_metadata`, `summarize`, `analyze_logical_relationship` 等の具体的なメソッドを実装する (design.md 参照)。

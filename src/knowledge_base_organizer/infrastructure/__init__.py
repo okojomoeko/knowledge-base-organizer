@@ -4,5 +4,6 @@ from knowledge_base_organizer.infrastructure.faiss_vector_store import FaissVect
 from knowledge_base_organizer.infrastructure.ollama_embedding import (
     OllamaEmbeddingService,
 )
+from knowledge_base_organizer.infrastructure.ollama_llm import OllamaLLMService
 
-__all__ = ["FaissVectorStore", "OllamaEmbeddingService"]
+__all__ = ["FaissVectorStore", "OllamaEmbeddingService", "OllamaLLMService"]
