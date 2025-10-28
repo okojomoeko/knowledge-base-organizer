@@ -521,7 +521,7 @@
             - `EmbeddingService` を実装し、`ollama/nomic-embed-text` を呼び出しベクトルを生成する。
             - **依存関係**: `requests` (既存)
             - _Requirements: 13.1, 13.2_
-        - [ ] **15.1.3 FaissVectorStore 実装 (Infrastructure層)**
+        - [x] **15.1.3 FaissVectorStore 実装 (Infrastructure層)**
             - `infrastructure/faiss_vector_store.py` を作成。
             - `VectorStore` を実装し、`faiss-cpu` を使ってインデックスをメモリ上およびファイル (`.kbo_index/vault.index`) に保存・ロードする。
             - **依存関係**: `faiss-cpu` (新規追加)
