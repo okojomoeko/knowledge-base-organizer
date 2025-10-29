@@ -36,12 +36,17 @@ class FrontmatterEnhancementService:
         """Initialize frontmatter enhancement service."""
         self.content_analyzer = ContentAnalysisService()
         self.tag_pattern_manager = TagPatternManager(config_dir)
+        self.llm_service = None  # Optional AI service for enhanced suggestions
 
         # Initialize English-Japanese translation patterns
         self.english_japanese_patterns = self._load_english_japanese_patterns()
 
         # Initialize legacy patterns
         self._initialize_legacy_patterns()
+
+    def set_llm_service(self, llm_service) -> None:
+        """Set the LLM service for AI-powered metadata suggestions."""
+        self.llm_service = llm_service
 
     def _load_english_japanese_patterns(self) -> dict[str, list[str]]:
         """Load English-Japanese translation patterns from TagPatternManager."""
@@ -703,6 +708,62 @@ class FrontmatterEnhancementService:
                     enhanced_frontmatter["aliases"] = current_aliases + new_aliases
                     changes_applied.append(
                         f"Added cross-language aliases: {new_aliases}"
+                    )
+
+            # 4.1. Apply AI-powered metadata suggestions (Requirement 17.1, 23.1)
+            if self.llm_service:
+                try:
+                    ai_suggestions = self.llm_service.suggest_metadata(
+                        file.content, enhanced_frontmatter
+                    )
+
+                    # Apply AI-suggested tags
+                    if ai_suggestions.suggested_tags:
+                        current_tags = enhanced_frontmatter.get("tags", [])
+                        new_ai_tags = [
+                            tag
+                            for tag in ai_suggestions.suggested_tags
+                            if tag not in current_tags
+                        ]
+                        if new_ai_tags:
+                            enhanced_frontmatter["tags"] = current_tags + new_ai_tags
+                            changes_applied.append(
+                                f"Added AI-suggested tags: {new_ai_tags}"
+                            )
+
+                    # Apply AI-suggested aliases
+                    if ai_suggestions.suggested_aliases:
+                        current_aliases = enhanced_frontmatter.get("aliases", [])
+                        new_ai_aliases = [
+                            alias
+                            for alias in ai_suggestions.suggested_aliases
+                            if alias not in current_aliases
+                        ]
+                        if new_ai_aliases:
+                            enhanced_frontmatter["aliases"] = (
+                                current_aliases + new_ai_aliases
+                            )
+                            changes_applied.append(
+                                f"Added AI-suggested aliases: {new_ai_aliases}"
+                            )
+
+                    # Apply AI-suggested description
+                    if (
+                        ai_suggestions.suggested_description
+                        and not enhanced_frontmatter.get("description")
+                    ):
+                        enhanced_frontmatter["description"] = (
+                            ai_suggestions.suggested_description
+                        )
+                        desc_preview = ai_suggestions.suggested_description[:50]
+                        changes_applied.append(
+                            f"Added AI-suggested description: {desc_preview}..."
+                        )
+
+                except Exception as e:
+                    # Log AI service errors but continue with other enhancements
+                    print(
+                        f"Warning: AI metadata suggestion failed for {file.path}: {e}"
                     )
 
             # 5. Apply improvements from content analysis (Requirement 8.1)

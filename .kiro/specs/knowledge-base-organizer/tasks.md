@@ -549,12 +549,12 @@
             - 質問文をベクトル化 → `VectorStore.search` で関連ノート検索 → `LLMService` にコンテキストとして渡し回答を生成させるユースケース (RAG) を実装する。
             - _Requirements: 18.1, 18.2, 21.1_
 
-    - [ ] **15.3 オンデマンドLLMのユースケース実装**
-        - [ ] **15.3.1 `organize` コマンドのAI強化 (Application層)**
+    - [x] **15.3 オンデマンドLLMのユースケース実装**
+        - [x] **15.3.1 `organize` コマンドのAI強化 (Application層)**
             - `organize` に `--ai-suggest-metadata` オプションを追加。
             - `FrontmatterEnhancementService` (または関連UseCase) を修正し、`LLMService.suggest_metadata` を呼び出し、タグやエイリアス、説明文を提案させる。
             - _Requirements: 17.1, 17.2, 17.5, 23.1, 23.2_
-        - [ ] **15.3.2 `summarize` コマンドの新規実装 (CLI層)**
+        - [x] **15.3.2 `summarize` コマンドの新規実装 (CLI層)**
             - `cli/summarize_command.py` を作成。
             - 指定されたファイルの要約を `LLMService.summarize` で生成するユースケースを実装する。
             - _Requirements: 17.2_

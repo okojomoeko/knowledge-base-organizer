@@ -16,6 +16,7 @@ from ..domain.services.frontmatter_enhancement_service import (
 )
 from ..infrastructure.config import ProcessingConfig
 from ..infrastructure.file_repository import FileRepository
+from ..infrastructure.ollama_llm import OllamaLLMService
 
 console = Console()
 
@@ -33,6 +34,7 @@ def organize_command(
     create_backup: bool = True,
     detect_duplicates: bool = False,
     duplicate_threshold: float = 0.7,
+    ai_suggest_metadata: bool = False,
 ) -> None:
     """Automatically organize and improve knowledge base quality."""
     try:
@@ -40,6 +42,8 @@ def organize_command(
         console.print(f"Mode: {'dry-run' if dry_run else 'execute'}")
         if interactive:
             console.print("Interactive mode enabled")
+        if ai_suggest_metadata:
+            console.print("AI metadata suggestions enabled")
 
         # Validate vault path
         if not vault_path.exists():
@@ -52,8 +56,19 @@ def organize_command(
             exclude_patterns=exclude_patterns or [],
         )
 
+        # Initialize AI service if requested
+        llm_service = None
+        if ai_suggest_metadata:
+            try:
+                llm_service = OllamaLLMService()
+                console.print("✅ AI service initialized successfully")
+            except Exception as e:
+                console.print(f"⚠️ Failed to initialize AI service: {e}")
+                console.print("Continuing without AI suggestions...")
+                ai_suggest_metadata = False
+
         # Load files and analyze
-        results = _analyze_vault_improvements(vault_path, config)
+        results = _analyze_vault_improvements(vault_path, config, llm_service)
 
         # Detect duplicates if requested
         duplicate_results = []
@@ -94,10 +109,12 @@ def organize_command(
             try:
                 if interactive:
                     applied_count = _apply_interactive_changes(
-                        results, vault_path, config
+                        results, vault_path, config, llm_service
                     )
                 else:
-                    applied_count = _apply_all_changes(results, vault_path, config)
+                    applied_count = _apply_all_changes(
+                        results, vault_path, config, llm_service
+                    )
 
                 # Generate comprehensive improvement report
                 _generate_improvement_report(
@@ -119,7 +136,7 @@ def organize_command(
 
 
 def _analyze_vault_improvements(
-    vault_path: Path, config: ProcessingConfig
+    vault_path: Path, config: ProcessingConfig, llm_service=None
 ) -> list[Any]:
     """Analyze vault for improvement opportunities."""
     file_repo = FileRepository(config)
@@ -140,6 +157,10 @@ def _analyze_vault_improvements(
         # Initialize enhancement service
         progress.update(task, description="Analyzing improvements...")
         enhancement_service = FrontmatterEnhancementService()
+
+        # Set LLM service if available
+        if llm_service:
+            enhancement_service.set_llm_service(llm_service)
 
         # Analyze improvements
         results = enhancement_service.enhance_vault_frontmatter(
@@ -319,12 +340,16 @@ def _output_json_results(
 
 
 def _apply_all_changes(
-    results: list[Any], vault_path: Path, config: ProcessingConfig
-) -> None:
+    results: list[Any], vault_path: Path, config: ProcessingConfig, llm_service=None
+) -> int:
     """Apply all improvements automatically."""
     file_repo = FileRepository(config)
     files = file_repo.load_vault(vault_path)
     enhancement_service = FrontmatterEnhancementService()
+
+    # Set LLM service if available
+    if llm_service:
+        enhancement_service.set_llm_service(llm_service)
 
     total_improvements = sum(r.improvements_made for r in results)
     console.print(f"\n🔧 Applying {total_improvements} improvements...")
@@ -355,15 +380,20 @@ def _apply_all_changes(
         progress.update(task, description=f"Applied {applied_count} improvements")
 
     console.print(f"✅ Successfully applied improvements to {applied_count} files")
+    return applied_count
 
 
 def _apply_interactive_changes(
-    results: list[Any], vault_path: Path, config: ProcessingConfig
-) -> None:
+    results: list[Any], vault_path: Path, config: ProcessingConfig, llm_service=None
+) -> int:
     """Apply improvements interactively."""
     file_repo = FileRepository(config)
     files = file_repo.load_vault(vault_path)
     enhancement_service = FrontmatterEnhancementService()
+
+    # Set LLM service if available
+    if llm_service:
+        enhancement_service.set_llm_service(llm_service)
 
     console.print("\n🔧 Interactive Organization Mode")
     console.print("Review each improvement and choose whether to apply it.\n")

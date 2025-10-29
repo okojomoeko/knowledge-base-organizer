@@ -86,6 +86,14 @@ try:
 except ImportError:
     pass  # Ask command not available
 
+# Import and add summarize command
+try:
+    from .summarize_command import summarize_command
+
+    app.command()(summarize_command)
+except ImportError:
+    pass  # Summarize command not available
+
 
 @app.command()
 def analyze(
@@ -704,6 +712,9 @@ def organize(
         "--duplicate-threshold",
         help="Similarity threshold for duplicate detection (0.0-1.0)",
     ),
+    ai_suggest_metadata: bool = typer.Option(
+        False, "--ai-suggest-metadata", help="Use AI to suggest metadata enhancements"
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
 ) -> None:
     """Automatically organize and improve knowledge base quality.
@@ -732,6 +743,47 @@ def organize(
         create_backup=create_backup,
         detect_duplicates=detect_duplicates,
         duplicate_threshold=duplicate_threshold,
+        ai_suggest_metadata=ai_suggest_metadata,
+    )
+
+
+@app.command()
+def summarize(
+    file_path: Path = typer.Argument(..., help="Path to markdown file to summarize"),
+    max_length: int = typer.Option(
+        200, "--max-length", help="Maximum length of summary in characters"
+    ),
+    output_file: Path | None = typer.Option(
+        None, "--output", "-o", help="Output file to save the summary"
+    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
+) -> None:
+    """Generate a concise summary of the specified file using AI.
+
+    This command uses an LLM to analyze the content of a markdown file
+    and generate a concise summary that captures the main points and
+    key information.
+
+    The summary length can be controlled with --max-length, and the result
+    can be saved to a file with --output.
+
+    Examples:
+        # Summarize a file
+        summarize /path/to/note.md
+
+        # Generate a longer summary
+        summarize /path/to/note.md --max-length 500
+
+        # Save summary to file
+        summarize /path/to/note.md --output summary.md
+    """
+    from .summarize_command import summarize_command
+
+    summarize_command(
+        file_path=file_path,
+        max_length=max_length,
+        output_file=output_file,
+        verbose=verbose,
     )
 
 
