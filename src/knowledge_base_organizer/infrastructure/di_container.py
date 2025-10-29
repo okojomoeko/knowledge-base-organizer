@@ -82,11 +82,8 @@ class DIContainer:
             FaissVectorStore,
         )
 
-        index_path = self.vault_path / ".kbo_index" / "vault.index"
         return FaissVectorStore(
             dimension=config.get("dimension", 768),
-            index_path=index_path,
-            metric=config.get("metric", "cosine"),
         )
 
     def _create_ollama_llm(self, config: dict[str, Any]) -> LLMService:

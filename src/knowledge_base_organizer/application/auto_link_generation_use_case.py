@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from ..domain.models import MarkdownFile
+from ..domain.services.ai_services import EmbeddingService, SearchResult, VectorStore
 from ..domain.services.content_processing_service import (
     ContentProcessingResult,
     ContentProcessingService,
@@ -37,6 +38,10 @@ class AutoLinkGenerationRequest(BaseModel):
         None  # Content patterns to exclude from linking
     )
     preserve_frontmatter: bool = True  # Preserve original frontmatter format
+    # Semantic enhancement options
+    enable_semantic: bool = False  # Enable semantic similarity search
+    semantic_threshold: float = 0.7  # Minimum similarity threshold for semantic links
+    semantic_max_candidates: int = 5  # Maximum semantic candidates per context
 
 
 class FileUpdate(BaseModel):
@@ -83,12 +88,16 @@ class AutoLinkGenerationUseCase:
         link_analysis_service: LinkAnalysisService,
         content_processing_service: ContentProcessingService,
         config: ProcessingConfig,
+        embedding_service: EmbeddingService | None = None,
+        vector_store: VectorStore | None = None,
     ) -> None:
         """Initialize auto-link generation use case."""
         self.file_repository = file_repository
         self.link_analysis_service = link_analysis_service
         self.content_processing_service = content_processing_service
         self.config = config
+        self.embedding_service = embedding_service
+        self.vector_store = vector_store
 
     def execute(self, request: AutoLinkGenerationRequest) -> AutoLinkGenerationResult:
         """Execute automatic link generation."""
@@ -160,6 +169,17 @@ class AutoLinkGenerationUseCase:
                     exclusion_zones,
                     current_file_id=file.extract_file_id(),
                 )
+
+                # Add semantic candidates if enabled
+                if request.enable_semantic and self._semantic_services_available():
+                    semantic_candidates = self._find_semantic_candidates(
+                        file,
+                        file_registry,
+                        exclusion_zones,
+                        request.semantic_threshold,
+                        request.semantic_max_candidates,
+                    )
+                    candidates.extend(semantic_candidates)
 
                 if not candidates:
                     skipped_files.append(f"No link candidates found: {file.path}")
@@ -332,7 +352,7 @@ class AutoLinkGenerationUseCase:
                 if update.update_type == "add_wikilink" and update.new_content:
                     # Update the content of the MarkdownFile object
                     markdown_file.content = update.new_content
-                    # Save the entire file, using the preserve_frontmatter setting from request
+                    # Save the entire file, using the preserve_frontmatter setting
                     self.file_repository.save_file(
                         markdown_file,
                         backup=True,
@@ -340,7 +360,7 @@ class AutoLinkGenerationUseCase:
                     )
 
                 elif update.update_type == "add_alias" and update.frontmatter_changes:
-                    # Update frontmatter with new aliases, using the preserve_frontmatter setting
+                    # Update frontmatter with new aliases
                     self.file_repository.update_frontmatter(
                         update.file_path,
                         update.frontmatter_changes,
@@ -446,3 +466,168 @@ class AutoLinkGenerationUseCase:
                 continue
 
         return exclusion_zones
+
+    def _semantic_services_available(self) -> bool:
+        """Check if semantic services are available."""
+        return self.embedding_service is not None and self.vector_store is not None
+
+    def _find_semantic_candidates(
+        self,
+        source_file: MarkdownFile,
+        file_registry: dict[str, MarkdownFile],
+        exclusion_zones: list[TextRange],  # noqa: ARG002
+        threshold: float,
+        max_candidates: int,
+    ) -> list:
+        """
+        Find semantic link candidates using vector similarity search.
+
+        Args:
+            source_file: The file to find candidates for
+            file_registry: Registry of all files
+            exclusion_zones: Areas to exclude from linking
+            threshold: Minimum similarity threshold
+            max_candidates: Maximum number of candidates to return
+
+        Returns:
+            List of semantic link candidates
+        """
+        if not self._semantic_services_available():
+            return []
+
+        try:
+            # Prepare content for embedding (similar to indexing)
+            content_for_embedding = self._prepare_content_for_semantic_search(
+                source_file
+            )
+
+            # Generate embedding for source content
+            embedding_result = self.embedding_service.create_embedding(
+                content_for_embedding
+            )
+
+            # Search for similar documents
+            search_results = self.vector_store.search(
+                query_vector=embedding_result.vector,
+                k=max_candidates * 2,  # Get more results to filter
+                threshold=threshold,
+            )
+
+            # Convert search results to link candidates
+            semantic_candidates = []
+            for result in search_results[:max_candidates]:
+                candidate = self._create_semantic_link_candidate(
+                    result, source_file, file_registry
+                )
+                if candidate:
+                    semantic_candidates.append(candidate)
+
+            return semantic_candidates
+
+        except Exception as e:
+            # Log error but don't fail the entire process
+            print(f"Error finding semantic candidates for {source_file.path}: {e}")
+            return []
+
+    def _prepare_content_for_semantic_search(self, file: MarkdownFile) -> str:
+        """
+        Prepare file content for semantic search embedding.
+
+        Args:
+            file: MarkdownFile to prepare
+
+        Returns:
+            Prepared content string
+        """
+        parts = []
+
+        # Add title if available
+        title = file.frontmatter.get("title")
+        if title:
+            parts.append(f"Title: {title}")
+
+        # Add tags if available
+        tags = file.frontmatter.get("tags", [])
+        if tags:
+            parts.append(f"Tags: {', '.join(tags)}")
+
+        # Add main content (limit to first 1000 characters for context)
+        content = file.content.strip()
+        if content:
+            # Remove frontmatter from content if present
+            if content.startswith("---"):
+                lines = content.split("\n")
+                frontmatter_end = -1
+                for i, line in enumerate(lines[1:], 1):
+                    if line.strip() == "---":
+                        frontmatter_end = i
+                        break
+                if frontmatter_end > 0:
+                    content = "\n".join(lines[frontmatter_end + 1 :]).strip()
+
+            # Limit content length for context
+            if len(content) > 1000:
+                content = content[:1000] + "..."
+
+            parts.append(content)
+
+        return "\n\n".join(parts)
+
+    def _create_semantic_link_candidate(
+        self,
+        search_result: SearchResult,
+        source_file: MarkdownFile,
+        file_registry: dict[str, MarkdownFile],
+    ):
+        """
+        Create a link candidate from a semantic search result.
+
+        Args:
+            search_result: Result from vector search
+            source_file: Source file for the link
+            file_registry: Registry of all files
+
+        Returns:
+            Link candidate object or None if not suitable
+        """
+        # Get target file from search result
+        target_file_path = search_result.metadata.get("file_path")
+        if not target_file_path:
+            return None
+
+        # Find target file in registry
+        target_file = None
+        for file in file_registry.values():
+            if str(file.path) == target_file_path:
+                target_file = file
+                break
+
+        if not target_file:
+            return None
+
+        # Don't link to self
+        if target_file.path == source_file.path:
+            return None
+
+        # Create a semantic link candidate
+        # This is a simplified version - in a full implementation,
+        # you would create proper LinkCandidate objects that integrate
+        # with the existing link analysis system
+
+        # For now, we'll create a basic candidate structure
+        # that can be processed by the content processing service
+        target_title = target_file.frontmatter.get("title", target_file.path.stem)
+        target_id = target_file.extract_file_id()
+
+        if not target_id:
+            return None
+
+        # Create a candidate that represents a semantic relationship
+        # This would need to be integrated with the existing LinkCandidate system
+        return {
+            "text": target_title,
+            "target_file_id": target_id,
+            "similarity_score": search_result.similarity_score,
+            "candidate_type": "semantic",
+            "position": None,  # Semantic links don't have specific positions
+        }

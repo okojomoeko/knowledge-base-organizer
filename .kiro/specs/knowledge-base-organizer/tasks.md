@@ -535,16 +535,16 @@
         - [x] **15.1.5 DIコンテナの更新**
             - CLI層（または設定ファイル）で、使用する具象クラス（Ollama/Faiss）をユースケースに注入 (DI) する設定を追加する。
 
-    - [ ] **15.2 RAG基盤 (Vector DB) のユースケース実装**
-        - [ ] **15.2.1 `index` コマンドの新規実装 (CLI層)**
+    - [x] **15.2 RAG基盤 (Vector DB) のユースケース実装**
+        - [x] **15.2.1 `index` コマンドの新規実装 (CLI層)**
             - `cli/index_command.py` を作成。
             - ボルト全体をスキャンし、`EmbeddingService` でベクトル化、`VectorStore` に登録し、インデックスファイルを保存するユースケースを実装する。
             - _Requirements: 13.1, 18.1_
-        - [ ] **15.2.2 `auto-link` コマンドのセマンティック強化 (Application層)**
+        - [x] **15.2.2 `auto-link` コマンドのセマンティック強化 (Application層)**
             - `auto-link` に `--semantic` オプションを追加。
             - `AutoLinkGenerationUseCase` を修正し、`VectorStore.search` を呼び出して意味的に類似したノートを候補に追加するロジックを実装する。
             - _Requirements: 13.1, 13.2, 13.3, 14.1, 21.1_
-        - [ ] **15.2.3 (オプション) `ask` コマンドの新規実装 (RAG)**
+        - [x] **15.2.3 (オプション) `ask` コマンドの新規実装 (RAG)**
             - `cli/ask_command.py` を作成。
             - 質問文をベクトル化 → `VectorStore.search` で関連ノート検索 → `LLMService` にコンテキストとして渡し回答を生成させるユースケース (RAG) を実装する。
             - _Requirements: 18.1, 18.2, 21.1_

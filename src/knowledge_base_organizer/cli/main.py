@@ -70,6 +70,22 @@ try:
 except ImportError:
     pass  # AI services not available
 
+# Import and add index command
+try:
+    from .index_command import index_command
+
+    app.command()(index_command)
+except ImportError:
+    pass  # Index command not available
+
+# Import and add ask command (RAG)
+try:
+    from .ask_command import ask_command
+
+    app.command()(ask_command)
+except ImportError:
+    pass  # Ask command not available
+
 
 @app.command()
 def analyze(
@@ -467,6 +483,17 @@ def auto_link(
     output_file: Path | None = typer.Option(
         None, "--output", "-o", help="Output file for CSV/JSON results"
     ),
+    semantic: bool = typer.Option(
+        False, "--semantic", help="Enable semantic similarity-based linking"
+    ),
+    semantic_threshold: float = typer.Option(
+        0.7,
+        "--semantic-threshold",
+        help="Minimum similarity threshold for semantic links (0.0-1.0)",
+    ),
+    semantic_max_candidates: int = typer.Option(
+        5, "--semantic-max", help="Maximum semantic candidates per file"
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
 ) -> None:
     """Generate WikiLinks from plain text mentions.
@@ -477,6 +504,20 @@ def auto_link(
 
     The command supports bidirectional updates: it adds WikiLinks to source files and
     adds corresponding aliases to target files to maintain consistency.
+
+    With --semantic enabled, the command also uses vector similarity search to find
+    semantically related content for linking, even when exact text matches don't exist.
+    This requires a vector index created with the 'index' command.
+
+    Examples:
+        # Basic auto-linking
+        auto-link /path/to/vault --execute
+
+        # Enable semantic linking
+        auto-link /path/to/vault --semantic --execute
+
+        # Semantic linking with custom threshold
+        auto-link /path/to/vault --semantic --semantic-threshold 0.8 --execute
     """
     if verbose:
         console.print(f"[bold blue]Generating auto-links in:[/bold blue] {vault_path}")
@@ -528,11 +569,46 @@ def auto_link(
             max_links_per_file=max_links_per_file
         )
 
+        # Initialize AI services if semantic linking is enabled
+        embedding_service = None
+        vector_store = None
+        if semantic:
+            try:
+                from knowledge_base_organizer.infrastructure.di_container import (
+                    AIServiceConfig,
+                    create_di_container,
+                )
+
+                ai_config = AIServiceConfig.get_default_config()
+                di_container = create_di_container(vault_path, config, ai_config)
+                embedding_service = di_container.get_embedding_service()
+                vector_store = di_container.get_vector_store()
+
+                # Try to load existing index
+                index_path = vault_path / ".kbo_index" / "vault.index"
+                if index_path.with_suffix(".faiss").exists():
+                    vector_store.load_index(index_path)
+                elif verbose:
+                    console.print(
+                        "[yellow]⚠[/yellow] No vector index found. "
+                        "Run 'index' command first for better semantic results."
+                    )
+
+            except Exception as e:
+                if verbose:
+                    console.print(
+                        f"[yellow]⚠[/yellow] Could not initialize AI services: {e}"
+                    )
+                    console.print("[dim]Semantic linking will be disabled[/dim]")
+                semantic = False
+
         use_case = AutoLinkGenerationUseCase(
             file_repository=file_repository,
             link_analysis_service=link_analysis_service,
             content_processing_service=content_processing_service,
             config=config,
+            embedding_service=embedding_service,
+            vector_store=vector_store,
         )
 
         progress.update(task, description="Building file registry...")
@@ -548,6 +624,9 @@ def auto_link(
             exclude_patterns,
             exclude_content_patterns,
             target_files,
+            semantic,
+            semantic_threshold,
+            semantic_max_candidates,
         )
 
         # Enhanced progress reporting for large vaults
@@ -963,6 +1042,9 @@ def _create_auto_link_request(
     exclude_patterns: list[str] | None,
     exclude_content_patterns: list[str] | None,
     target_files: list[str] | None,
+    enable_semantic: bool = False,
+    semantic_threshold: float = 0.7,
+    semantic_max_candidates: int = 5,
 ) -> AutoLinkGenerationRequest:
     """Create auto-link generation request."""
     return AutoLinkGenerationRequest(
@@ -976,6 +1058,9 @@ def _create_auto_link_request(
         max_files_to_process=max_files_to_process,
         exclude_content_patterns=exclude_content_patterns,
         preserve_frontmatter=True,  # Always preserve frontmatter format by default
+        enable_semantic=enable_semantic,
+        semantic_threshold=semantic_threshold,
+        semantic_max_candidates=semantic_max_candidates,
     )
 
 
