@@ -56,6 +56,7 @@ uv run python -m knowledge_base_organizer auto-link /path/to/your/vault --dry-ru
 | **デッドリンク検出** | 存在しないファイルへのリンクを検出 | `detect-dead-links` | リンク整合性確認 |
 | **自動WikiLink生成** | 日本語対応の高精度リンク作成 | `auto-link` | 知識の関連付け |
 | **総合整理** | フロントマター改善と重複検出 | `organize` | 品質向上 |
+| **AI強化要約生成** | LLMを使用した高品質な要約作成 | `summarize` | コンテンツ要約 |
 | **タグ管理** | タグパターンの管理 | `tags` | タグ体系整理 |
 
 ## 🎯 ユースケース別逆引きガイド
@@ -144,6 +145,37 @@ uv run python -m knowledge_base_organizer auto-link /path/to/vault --target "spe
 
 # 大規模ボルト用（ファイル数制限）
 uv run python -m knowledge_base_organizer auto-link /path/to/vault --execute --max-files 50 --max-links 10
+```
+
+### 🤖 AI機能を活用したい
+
+#### AI強化フロントマター生成
+
+```bash
+# AI提案を含む総合整理（プレビュー）
+uv run python -m knowledge_base_organizer organize /path/to/vault --ai-suggest-metadata --dry-run
+
+# AI提案を適用して実際に改善
+uv run python -m knowledge_base_organizer organize /path/to/vault --ai-suggest-metadata --execute --interactive
+
+# バックアップ付きで自動適用
+uv run python -m knowledge_base_organizer organize /path/to/vault --ai-suggest-metadata --execute --backup
+```
+
+#### AI要約生成
+
+```bash
+# 単一ファイルの要約生成
+uv run python -m knowledge_base_organizer summarize /path/to/note.md
+
+# 長めの要約を生成
+uv run python -m knowledge_base_organizer summarize /path/to/note.md --max-length 500
+
+# 要約をファイルに保存
+uv run python -m knowledge_base_organizer summarize /path/to/note.md --output summary.md
+
+# 詳細な出力で実行
+uv run python -m knowledge_base_organizer summarize /path/to/note.md --verbose
 ```
 
 ### 🛠️ ボルト全体を一括で整理したい
@@ -242,6 +274,11 @@ uv run python -m knowledge_base_organizer tags import tag-patterns.yaml
 - `--schedule SCHEDULE`: スケジュール実行（将来実装予定）
 - `--duplicate-threshold FLOAT`: 重複検出の類似度閾値（0.0-1.0）
 
+### AI機能オプション
+
+- `--ai-suggest-metadata`: AI によるメタデータ提案を有効化（organizeコマンド）
+- `--max-length N`: 要約の最大文字数を指定（summarizeコマンド）
+
 ### 高度なオプション
 
 - `--exclude-tables`: テーブル内容をリンク処理から除外
@@ -250,6 +287,168 @@ uv run python -m knowledge_base_organizer tags import tag-patterns.yaml
 - `--sort-by FIELD`: 結果のソート順を指定
 - `--limit N`: 表示する結果数を制限
 - `--only-with-suggestions`: 修正提案があるもののみ表示
+
+## 🤖 AI機能の詳細
+
+knowledge-base-organizerは、LLM（Large Language Model）を活用した高度な機能を提供します。これらの機能により、手動では困難な高品質なメタデータ生成と要約作成が可能になります。
+
+### AI強化フロントマター生成（Phase 13実装済み）
+
+`organize`コマンドに`--ai-suggest-metadata`オプションを追加することで、AIによる高度なメタデータ提案が利用できます。
+
+#### 機能概要
+
+- **インテリジェントタグ提案**: コンテンツを分析して関連性の高いタグを自動提案
+- **クロス言語エイリアス**: 英日対訳や略語展開に基づくエイリアス提案
+- **メタデータ抽出**: コンテンツから著者、出典、プロジェクト情報などを自動抽出
+- **説明文生成**: ファイル内容に基づく適切な説明文の自動生成
+
+#### 使用例
+
+```bash
+# AI提案を含む分析（安全）
+uv run python -m knowledge_base_organizer organize /path/to/vault --ai-suggest-metadata --dry-run
+
+# インタラクティブモードで確認しながら適用
+uv run python -m knowledge_base_organizer organize /path/to/vault --ai-suggest-metadata --execute --interactive
+
+# 特定のファイルパターンのみAI処理
+uv run python -m knowledge_base_organizer organize /path/to/vault \
+  --ai-suggest-metadata --include "101_PermanentNotes/**" --execute
+```
+
+#### AI提案の種類
+
+1. **技術タグ**: プログラミング言語、フレームワーク、技術概念
+2. **コンテンツタグ**: 文書の内容や分野に基づくタグ
+3. **言語横断エイリアス**: 「API」→「エーピーアイ」、「DB」→「データベース」
+4. **メタデータフィールド**: author、source、project、status等
+5. **説明文**: ファイル内容を要約した簡潔な説明
+
+### AI要約生成（Phase 15実装済み）
+
+`summarize`コマンドは、LLMを使用してマークダウンファイルの高品質な要約を生成します。
+
+#### 機能概要
+
+- **コンテンツ理解**: マークダウン構造を理解した要約生成
+- **長さ制御**: 指定した文字数内での要約作成
+- **日本語対応**: 日本語コンテンツの自然な要約
+- **キーポイント抽出**: 重要な情報を漏らさない要約
+
+#### 使用例
+
+```bash
+# 基本的な要約生成（200文字）
+uv run python -m knowledge_base_organizer summarize /path/to/note.md
+
+# 詳細な要約（500文字）
+uv run python -m knowledge_base_organizer summarize /path/to/note.md --max-length 500
+
+# 要約をファイルに保存
+uv run python -m knowledge_base_organizer summarize /path/to/note.md --output summary.md
+
+# 処理詳細を表示
+uv run python -m knowledge_base_organizer summarize /path/to/note.md --verbose
+```
+
+#### 要約の品質
+
+- **構造理解**: 見出し、リスト、コードブロックを考慮
+- **重要度判定**: 文書内の重要な情報を優先的に抽出
+- **自然な文章**: 読みやすく自然な日本語での要約
+- **情報保持**: 元文書の主要な情報を漏らさない
+
+### AI機能の前提条件
+
+#### 必要なソフトウェア
+
+- **Ollama**: ローカルLLMランタイム
+- **対応モデル**: llama3.1, qwen2.5等の日本語対応モデル
+
+#### セットアップ手順
+
+1. **Ollamaのインストール**
+
+   ```bash
+   # macOS
+   brew install ollama
+
+   # Linux
+   curl -fsSL https://ollama.ai/install.sh | sh
+   ```
+
+2. **モデルのダウンロード**
+
+   ```bash
+   # 推奨モデル（日本語対応）
+   ollama pull qwen2.5:7b
+
+   # または
+   ollama pull llama3.1:8b
+   ```
+
+3. **Ollamaサービスの起動**
+
+   ```bash
+   ollama serve
+   ```
+
+#### 設定の確認
+
+```bash
+# AI機能が利用可能か確認
+uv run python -m knowledge_base_organizer organize /path/to/vault --ai-suggest-metadata --dry-run --verbose
+
+# 要約機能のテスト
+uv run python -m knowledge_base_organizer summarize /path/to/test-note.md --verbose
+```
+
+### AI機能の制限事項
+
+#### 現在の制限
+
+- **ローカル実行のみ**: クラウドAPIは未対応
+- **処理時間**: 大量ファイルの処理には時間がかかる
+- **モデル依存**: 使用するLLMモデルにより品質が変動
+
+#### 推奨事項
+
+- **段階的適用**: 少数のファイルから開始
+- **dry-runモード**: 必ず事前にプレビューで確認
+- **バックアップ**: 重要なボルトは事前にバックアップ
+- **インタラクティブモード**: 初回は`--interactive`で確認
+
+### トラブルシューティング
+
+#### よくある問題
+
+**Q: AI機能が利用できない**
+
+```bash
+# Ollamaの状態確認
+ollama list
+ollama ps
+
+# サービス再起動
+ollama serve
+```
+
+**Q: 要約生成が失敗する**
+
+```bash
+# モデルの確認
+ollama list
+
+# 詳細エラー情報
+uv run python -m knowledge_base_organizer summarize /path/to/note.md --verbose
+```
+
+**Q: AI提案の品質が低い**
+
+- より高性能なモデルを使用（qwen2.5:14b等）
+- ファイル内容の品質を向上（明確な見出し、構造化）
+- 専門用語辞書の拡充（config/japanese_variations.yaml）
 
 ## ⚙️ 設定ファイルとカスタマイズ
 
@@ -548,15 +747,41 @@ uv run python -m knowledge_base_organizer analyze /path/to/vault --verbose
 # 2. 包括的メンテナンス分析（推奨）
 uv run python -m knowledge_base_organizer maintain /path/to/vault --dry-run --verbose
 
-# 3. 段階的に問題を解決
-uv run python -m knowledge_base_organizer maintain /path/to/vault --task organize --execute --max-files 20
+# 3. AI強化フロントマター改善（段階的）
+uv run python -m knowledge_base_organizer organize /path/to/vault --ai-suggest-metadata --dry-run --max-files 10
+uv run python -m knowledge_base_organizer organize /path/to/vault --ai-suggest-metadata --execute --interactive --max-files 10
+
+# 4. 従来の問題解決
 uv run python -m knowledge_base_organizer maintain /path/to/vault --task dead-links --dry-run
 
-# 4. 自動リンク生成（少数から開始）
+# 5. 自動リンク生成（少数から開始）
 uv run python -m knowledge_base_organizer auto-link /path/to/vault --execute --max-files 10 --max-links 5
 
-# 5. 最終確認と全体レポート
+# 6. 最終確認と全体レポート
 uv run python -m knowledge_base_organizer maintain /path/to/vault --output-format json --output final-report.json
+```
+
+### AI機能を活用したワークフロー
+
+```bash
+# AI強化ワークフロー（推奨）
+
+# 1. 現状分析
+uv run python -m knowledge_base_organizer analyze /path/to/vault --verbose
+
+# 2. AI提案の確認（安全）
+uv run python -m knowledge_base_organizer organize /path/to/vault --ai-suggest-metadata --dry-run --max-files 5
+
+# 3. インタラクティブ適用
+uv run python -m knowledge_base_organizer organize /path/to/vault --ai-suggest-metadata --execute --interactive --max-files 10
+
+# 4. 重要ファイルの要約生成
+for file in important-notes/*.md; do
+  uv run python -m knowledge_base_organizer summarize "$file" --output "${file%.md}-summary.md"
+done
+
+# 5. 全体の健康状態確認
+uv run python -m knowledge_base_organizer maintain /path/to/vault --output-format json --output ai-enhanced-report.json
 ```
 
 ### 日常的なメンテナンス
@@ -612,22 +837,32 @@ uv run python -m knowledge_base_organizer maintain /path/to/large-vault \
 ### プロジェクト別カスタマイズ例
 
 ```bash
-# 学術研究ボルト用
-uv run python -m knowledge_base_organizer maintain /path/to/academic-vault \
-  --include "Papers/**" --include "Notes/**" \
-  --exclude "Drafts/**" \
-  --task organize --task dead-links
+# 学術研究ボルト用（AI強化）
+uv run python -m knowledge_base_organizer organize /path/to/academic-vault \
+  --ai-suggest-metadata --include "Papers/**" --include "Notes/**" \
+  --exclude "Drafts/**" --execute --interactive
 
-# ソフトウェア開発ボルト用
-uv run python -m knowledge_base_organizer maintain /path/to/dev-vault \
-  --include "Projects/**" --include "TechNotes/**" \
-  --task organize --task duplicates \
-  --duplicate-threshold 0.8
+# 論文要約の一括生成
+find /path/to/academic-vault/Papers -name "*.md" -exec \
+  uv run python -m knowledge_base_organizer summarize {} --max-length 300 --output {}-abstract.md \;
 
-# 個人日記・メモボルト用
-uv run python -m knowledge_base_organizer auto-link /path/to/personal-vault \
-  --include "Daily/**" --include "Thoughts/**" \
-  --max-links 3 --exclude-tables --execute
+# ソフトウェア開発ボルト用（技術タグ強化）
+uv run python -m knowledge_base_organizer organize /path/to/dev-vault \
+  --ai-suggest-metadata --include "Projects/**" --include "TechNotes/**" \
+  --execute --backup
+
+# 技術文書の要約生成
+uv run python -m knowledge_base_organizer summarize /path/to/dev-vault/architecture-design.md \
+  --max-length 400 --output project-summary.md
+
+# 個人日記・メモボルト用（軽量AI処理）
+uv run python -m knowledge_base_organizer organize /path/to/personal-vault \
+  --ai-suggest-metadata --include "Daily/**" --include "Thoughts/**" \
+  --max-improvements 10 --execute
+
+# 日記エントリの要約
+uv run python -m knowledge_base_organizer summarize /path/to/personal-vault/Daily/2024-01-15.md \
+  --max-length 150
 ```
 
 ## 🎨 カスタマイズと自動化
