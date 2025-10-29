@@ -246,6 +246,28 @@ uv run python -m knowledge_base_organizer tags remove "古いタグ"
 uv run python -m knowledge_base_organizer tags import tag-patterns.yaml
 ```
 
+### 🤖 LLM設定を管理したい
+
+```bash
+# LLM設定ファイルのテンプレートを作成
+uv run python -m knowledge_base_organizer llm create-config --output llm_config.yaml
+
+# 利用可能なプロバイダーを確認
+uv run python -m knowledge_base_organizer llm list-providers
+
+# 利用可能なモデルを確認
+uv run python -m knowledge_base_organizer llm list-models --provider ollama
+
+# 接続テスト
+uv run python -m knowledge_base_organizer llm test-connection --provider ollama --verbose
+
+# テキスト生成テスト
+uv run python -m knowledge_base_organizer llm test-generation --provider ollama --prompt "Hello, world!"
+
+# 現在の設定を表示
+uv run python -m knowledge_base_organizer llm show-config
+```
+
 ## ⚙️ よく使うオプション
 
 ### 安全性オプション
@@ -278,6 +300,9 @@ uv run python -m knowledge_base_organizer tags import tag-patterns.yaml
 
 - `--ai-suggest-metadata`: AI によるメタデータ提案を有効化（organizeコマンド）
 - `--max-length N`: 要約の最大文字数を指定（summarizeコマンド）
+- `--llm-provider PROVIDER`: 使用するLLMプロバイダーを指定（ollama, lm_studio, etc.）
+- `--llm-model MODEL`: 使用するLLMモデルを指定
+- `--llm-config PATH`: LLM設定ファイルのパスを指定
 
 ### 高度なオプション
 
@@ -350,6 +375,79 @@ uv run python -m knowledge_base_organizer summarize /path/to/note.md --output su
 
 # 処理詳細を表示
 uv run python -m knowledge_base_organizer summarize /path/to/note.md --verbose
+
+# 特定のLLMプロバイダーとモデルを指定
+uv run python -m knowledge_base_organizer summarize /path/to/note.md \
+  --llm-provider ollama --llm-model qwen2.5:14b --max-length 500
+
+# LM Studioを使用
+uv run python -m knowledge_base_organizer summarize /path/to/note.md \
+  --llm-provider lm_studio --max-length 300
+```
+
+### LLM設定管理
+
+#### 設定ファイルの作成
+
+```bash
+# LLM設定ファイルのテンプレートを作成
+uv run python -m knowledge_base_organizer llm create-config --output llm_config.yaml
+
+# 利用可能なプロバイダーを確認
+uv run python -m knowledge_base_organizer llm list-providers
+
+# 接続テスト
+uv run python -m knowledge_base_organizer llm test-connection --provider ollama
+
+# テキスト生成テスト
+uv run python -m knowledge_base_organizer llm test-generation --provider ollama --verbose
+```
+
+#### 設定ファイルの例
+
+```yaml
+# llm_config.yaml
+default_provider: "ollama"
+
+providers:
+  ollama:
+    base_url: "http://localhost:11434"
+    model_name: "qwen2.5:7b"
+    timeout: 120
+    options:
+      temperature: 0.3
+      top_p: 0.9
+
+  lm_studio:
+    base_url: "http://localhost:1234"
+    model_name: "local-model"
+    api_format: "openai"
+    timeout: 120
+    options:
+      temperature: 0.3
+      max_tokens: 2048
+
+  custom_api:
+    base_url: "http://your-server:8000"
+    model_name: "custom-model"
+    api_format: "openai"
+    api_key: "your-api-key"
+```
+
+#### コマンドラインでのプロバイダー指定
+
+```bash
+# Ollamaで特定のモデルを使用
+uv run python -m knowledge_base_organizer organize /path/to/vault --ai-suggest-metadata \
+  --llm-provider ollama --llm-model qwen2.5:14b --dry-run
+
+# LM Studioを使用
+uv run python -m knowledge_base_organizer organize /path/to/vault --ai-suggest-metadata \
+  --llm-provider lm_studio --execute --interactive
+
+# カスタム設定ファイルを使用
+uv run python -m knowledge_base_organizer organize /path/to/vault --ai-suggest-metadata \
+  --llm-config /path/to/custom/llm_config.yaml --dry-run
 ```
 
 #### 要約の品質
@@ -361,10 +459,11 @@ uv run python -m knowledge_base_organizer summarize /path/to/note.md --verbose
 
 ### AI機能の前提条件
 
-#### 必要なソフトウェア
+#### 対応プロバイダー
 
-- **Ollama**: ローカルLLMランタイム
-- **対応モデル**: llama3.1, qwen2.5等の日本語対応モデル
+- **Ollama**: ローカルLLMランタイム（推奨）
+- **LM Studio**: ローカルLLMサーバー
+- **OpenAI互換API**: カスタムエンドポイント
 
 #### セットアップ手順
 
@@ -394,14 +493,42 @@ uv run python -m knowledge_base_organizer summarize /path/to/note.md --verbose
    ollama serve
    ```
 
+4. **LM Studioの場合**
+   - LM Studioをダウンロード・インストール
+   - モデルをダウンロード
+   - ローカルサーバーを起動（通常ポート1234）
+
 #### 設定の確認
 
 ```bash
+# 設定ファイルを作成
+uv run python -m knowledge_base_organizer llm create-config
+
+# プロバイダー一覧を確認
+uv run python -m knowledge_base_organizer llm list-providers
+
+# 接続テスト
+uv run python -m knowledge_base_organizer llm test-connection --verbose
+
 # AI機能が利用可能か確認
 uv run python -m knowledge_base_organizer organize /path/to/vault --ai-suggest-metadata --dry-run --verbose
+```
 
-# 要約機能のテスト
-uv run python -m knowledge_base_organizer summarize /path/to/test-note.md --verbose
+### 環境変数による設定
+
+```bash
+# Ollamaの設定
+export OLLAMA_BASE_URL="http://localhost:11434"
+export OLLAMA_MODEL="qwen2.5:7b"
+
+# LM Studioの設定
+export LM_STUDIO_BASE_URL="http://localhost:1234"
+
+# デフォルトプロバイダーの変更
+export LLM_PROVIDER="lm_studio"
+
+# 設定ファイルのパス指定
+export LLM_CONFIG_PATH="/path/to/custom/llm_config.yaml"
 ```
 
 ### AI機能の制限事項
@@ -426,11 +553,15 @@ uv run python -m knowledge_base_organizer summarize /path/to/test-note.md --verb
 **Q: AI機能が利用できない**
 
 ```bash
-# Ollamaの状態確認
+# プロバイダーの状態確認
+uv run python -m knowledge_base_organizer llm list-providers
+
+# 接続テスト
+uv run python -m knowledge_base_organizer llm test-connection --verbose
+
+# Ollamaの場合
 ollama list
 ollama ps
-
-# サービス再起動
 ollama serve
 ```
 
@@ -438,7 +569,10 @@ ollama serve
 
 ```bash
 # モデルの確認
-ollama list
+uv run python -m knowledge_base_organizer llm list-models
+
+# 生成テスト
+uv run python -m knowledge_base_organizer llm test-generation --verbose
 
 # 詳細エラー情報
 uv run python -m knowledge_base_organizer summarize /path/to/note.md --verbose
@@ -449,6 +583,7 @@ uv run python -m knowledge_base_organizer summarize /path/to/note.md --verbose
 - より高性能なモデルを使用（qwen2.5:14b等）
 - ファイル内容の品質を向上（明確な見出し、構造化）
 - 専門用語辞書の拡充（config/japanese_variations.yaml）
+- 異なるプロバイダーやモデルを試す
 
 ## ⚙️ 設定ファイルとカスタマイズ
 

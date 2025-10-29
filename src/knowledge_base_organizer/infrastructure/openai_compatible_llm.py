@@ -1,14 +1,10 @@
 """
-Ollama LLM Service Implementation
+OpenAI-Compatible LLM Service Implementation
 
 This module provides an implementation of the LLMService interface
-using Ollama's llama3.2:3b model for LLM-based reasoning and content analysis.
+using OpenAI-compatible APIs (like LM Studio, LocalAI, etc.).
 
-Supports:
-- Requirement 17.1: Intelligent frontmatter auto-enhancement
-- Requirement 17.2: Content summarization
-- Requirement 23.1: Concept-based automatic tagging and alias generation
-- Requirement 24.1: Logical relationship analysis between content
+Supports the same features as OllamaLLMService but uses OpenAI API format.
 """
 
 import json
@@ -31,97 +27,91 @@ from knowledge_base_organizer.domain.services.ai_services import (
 logger = logging.getLogger(__name__)
 
 
-class OllamaLLMService(LLMService):
+class OpenAICompatibleLLMService(LLMService):
     """
-    Ollama-based LLM service using llama3.2:3b model.
+    OpenAI-compatible LLM service for LM Studio, LocalAI, and similar providers.
 
-    This service connects to a local Ollama instance to perform
+    This service connects to OpenAI-compatible APIs to perform
     LLM-based reasoning, content analysis, and metadata generation.
     """
 
     def __init__(
         self,
-        base_url: str = "http://localhost:11434",
-        model_name: str = "qwen2.5:7b",
+        base_url: str = "http://localhost:1234",
+        model_name: str = "local-model",
+        api_key: str | None = None,
         timeout: int = 60,
         **options,
     ):
         """
-        Initialize the Ollama LLM service.
+        Initialize the OpenAI-compatible LLM service.
 
         Args:
-            base_url: Base URL for Ollama API (default: http://localhost:11434)
-            model_name: Name of the LLM model (default: qwen2.5:7b)
+            base_url: Base URL for the API (default: http://localhost:1234 for LM Studio)
+            model_name: Name of the LLM model (default: local-model)
+            api_key: API key if required (optional for local services)
             timeout: Request timeout in seconds (default: 60)
-            **options: Additional options for Ollama (temperature, top_p, etc.)
+            **options: Additional options (temperature, max_tokens, etc.)
         """
         self.base_url = base_url.rstrip("/")
         self.model_name = model_name
+        self.api_key = api_key
         self.timeout = timeout
-        self.options = {"temperature": 0.3, "top_p": 0.9, "top_k": 40, **options}
+        self.options = {"temperature": 0.3, "max_tokens": 2048, "top_p": 0.9, **options}
         self._model_info: dict[str, Any] | None = None
 
-        # Verify Ollama is available and model is accessible
+        # Verify service availability
         self._verify_service_availability()
 
     def _verify_service_availability(self) -> None:
         """
-        Verify that Ollama service is running and the model is available.
+        Verify that the OpenAI-compatible service is running and accessible.
 
         Raises:
-            ModelNotAvailableError: If Ollama service or model is not available
+            ModelNotAvailableError: If service is not available
         """
         try:
-            # Check if Ollama service is running
-            response = requests.get(f"{self.base_url}/api/tags", timeout=self.timeout)
-            response.raise_for_status()
-
-            # Check if the LLM model is available
-            models_data = response.json()
-            available_models = [
-                model["name"] for model in models_data.get("models", [])
-            ]
-
-            if self.model_name not in available_models:
-                logger.warning(
-                    f"Model {self.model_name} not found in available models: "
-                    f"{available_models}"
-                )
-                # Try to pull the model
-                self._pull_model()
-
-        except requests.exceptions.RequestException as e:
-            raise ModelNotAvailableError(
-                f"Ollama service not available at {self.base_url}: {e}"
-            ) from e
-
-    def _pull_model(self) -> None:
-        """
-        Attempt to pull the LLM model if it's not available.
-
-        Raises:
-            ModelNotAvailableError: If model cannot be pulled
-        """
-        try:
-            logger.info(f"Attempting to pull model: {self.model_name}")
-            response = requests.post(
-                f"{self.base_url}/api/pull",
-                json={"name": self.model_name},
-                timeout=600,  # Longer timeout for model pulling (10 minutes)
+            # Try to get models list
+            headers = self._get_headers()
+            response = requests.get(
+                f"{self.base_url}/v1/models", headers=headers, timeout=self.timeout
             )
             response.raise_for_status()
-            logger.info(f"Successfully pulled model: {self.model_name}")
+
+            # Check if our model is available
+            models_data = response.json()
+            available_models = [model["id"] for model in models_data.get("data", [])]
+
+            if available_models and self.model_name not in available_models:
+                logger.warning(
+                    f"Model {self.model_name} not found in available models: "
+                    f"{available_models}. Using first available model."
+                )
+                # Use the first available model if specified model not found
+                if available_models:
+                    self.model_name = available_models[0]
 
         except requests.exceptions.RequestException as e:
             raise ModelNotAvailableError(
-                f"Failed to pull model {self.model_name}: {e}"
+                f"OpenAI-compatible service not available at {self.base_url}: {e}"
             ) from e
+
+    def _get_headers(self) -> dict[str, str]:
+        """Get HTTP headers for API requests."""
+        headers = {
+            "Content-Type": "application/json",
+        }
+
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        return headers
 
     def _generate_completion(
         self, prompt: str, system_prompt: str | None = None
     ) -> str:
         """
-        Generate a completion using the Ollama generate API.
+        Generate a completion using the OpenAI-compatible chat API.
 
         Args:
             prompt: The user prompt
@@ -134,41 +124,48 @@ class OllamaLLMService(LLMService):
             LLMError: If generation fails
         """
         try:
-            request_data = {
-                "model": self.model_name,
-                "prompt": prompt,
-                "stream": False,
-                "options": self.options,
-            }
+            messages = []
 
             if system_prompt:
-                request_data["system"] = system_prompt
+                messages.append({"role": "system", "content": system_prompt})
 
+            messages.append({"role": "user", "content": prompt})
+
+            request_data = {
+                "model": self.model_name,
+                "messages": messages,
+                **self.options,
+            }
+
+            headers = self._get_headers()
             response = requests.post(
-                f"{self.base_url}/api/generate",
+                f"{self.base_url}/v1/chat/completions",
                 json=request_data,
+                headers=headers,
                 timeout=self.timeout,
             )
             response.raise_for_status()
 
             data = response.json()
-            generated_text = data.get("response", "").strip()
+
+            if "choices" not in data or not data["choices"]:
+                raise LLMError("No response choices returned from API")
+
+            generated_text = data["choices"][0]["message"]["content"].strip()
 
             if not generated_text:
-                raise LLMError("No response generated from Ollama")
+                raise LLMError("Empty response generated from API")
 
             return generated_text
 
         except requests.exceptions.RequestException as e:
             raise LLMError(f"Failed to generate completion: {e}") from e
         except (KeyError, json.JSONDecodeError) as e:
-            raise LLMError(f"Invalid response from Ollama: {e}") from e
+            raise LLMError(f"Invalid response from API: {e}") from e
 
     def extract_concepts(self, content: str) -> ConceptExtractionResult:
         """
         Extract core concepts from content for tagging and categorization.
-
-        Supports Requirement 23.1: Concept-based automatic tagging.
 
         Args:
             content: Text content to analyze
@@ -231,8 +228,6 @@ class OllamaLLMService(LLMService):
     ) -> MetadataSuggestion:
         """
         Generate intelligent metadata suggestions for frontmatter enhancement.
-
-        Supports Requirement 17.1: Intelligent frontmatter auto-enhancement.
 
         Args:
             content: Note content to analyze
@@ -357,8 +352,6 @@ class OllamaLLMService(LLMService):
         """
         Analyze logical relationships between two pieces of content.
 
-        Supports Requirement 24: Logical relationship identification.
-
         Args:
             content_a: First content for comparison
             content_b: Second content for comparison
@@ -438,8 +431,6 @@ class OllamaLLMService(LLMService):
     ) -> SimilarityResult:
         """
         Evaluate if a link candidate matches the context appropriately.
-
-        Supports Requirement 13.1, 13.2: Context-aware linking.
 
         Args:
             candidate_text: Text that could become a link
@@ -525,8 +516,6 @@ class OllamaLLMService(LLMService):
         """
         Rank multiple potential link targets by contextual relevance.
 
-        Supports Requirement 14: Link disambiguation.
-
         Args:
             candidate_text: Text that could become a link
             source_context: Context around the candidate text
@@ -606,19 +595,28 @@ class OllamaLLMService(LLMService):
         """
         if self._model_info is None:
             try:
-                # Get model information from Ollama
-                response = requests.post(
-                    f"{self.base_url}/api/show",
-                    json={"name": self.model_name},
+                # Get model information from API
+                headers = self._get_headers()
+                response = requests.get(
+                    f"{self.base_url}/v1/models",
+                    headers=headers,
                     timeout=self.timeout,
                 )
                 response.raise_for_status()
 
-                model_data = response.json()
+                models_data = response.json()
+                model_details = {}
+
+                # Find our specific model
+                for model in models_data.get("data", []):
+                    if model["id"] == self.model_name:
+                        model_details = model
+                        break
 
                 self._model_info = {
                     "model_name": self.model_name,
                     "base_url": self.base_url,
+                    "api_format": "openai",
                     "capabilities": [
                         "concept_extraction",
                         "metadata_suggestion",
@@ -627,8 +625,8 @@ class OllamaLLMService(LLMService):
                         "context_evaluation",
                         "target_disambiguation",
                     ],
-                    "model_details": model_data.get("details", {}),
-                    "parameters": model_data.get("parameters", {}),
+                    "model_details": model_details,
+                    "options": self.options,
                     "timeout": self.timeout,
                 }
 
@@ -637,6 +635,7 @@ class OllamaLLMService(LLMService):
                 self._model_info = {
                     "model_name": self.model_name,
                     "base_url": self.base_url,
+                    "api_format": "openai",
                     "capabilities": ["basic_generation"],
                     "error": str(e),
                 }

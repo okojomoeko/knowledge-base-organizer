@@ -8,7 +8,6 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from ..infrastructure.config import ProcessingConfig
 from ..infrastructure.file_repository import FileRepository
-from ..infrastructure.ollama_llm import OllamaLLMService
 
 console = Console()
 
@@ -18,6 +17,9 @@ def summarize_command(
     max_length: int = 200,
     output_file: Path | None = None,
     verbose: bool = False,
+    llm_provider: str | None = None,
+    llm_model: str | None = None,
+    llm_config_path: Path | None = None,
 ) -> None:
     """Generate a concise summary of the specified file using AI.
 
@@ -52,8 +54,19 @@ def summarize_command(
 
             # Initialize LLM service
             try:
-                llm_service = OllamaLLMService()
+                from ..infrastructure.llm_factory import create_llm_service
+
+                llm_service = create_llm_service(
+                    provider_name=llm_provider,
+                    model_name=llm_model,
+                    config_path=llm_config_path,
+                )
                 progress.update(task, description="AI service initialized")
+                if verbose:
+                    model_info = llm_service.get_model_info()
+                    console.print(
+                        f"[dim]Using: {model_info.get('model_name', 'Unknown')} via {model_info.get('api_format', 'Unknown')}[/dim]"
+                    )
             except Exception as e:
                 progress.update(task, description="Failed to initialize AI service")
                 console.print(f"❌ Failed to initialize AI service: {e}")

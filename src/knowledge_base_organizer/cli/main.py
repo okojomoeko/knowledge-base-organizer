@@ -94,6 +94,14 @@ try:
 except ImportError:
     pass  # Summarize command not available
 
+# Import and add LLM management commands
+try:
+    from .llm_command import app as llm_command_app
+
+    app.add_typer(llm_command_app, name="llm")
+except ImportError:
+    pass  # LLM commands not available
+
 
 @app.command()
 def analyze(
@@ -715,6 +723,13 @@ def organize(
     ai_suggest_metadata: bool = typer.Option(
         False, "--ai-suggest-metadata", help="Use AI to suggest metadata enhancements"
     ),
+    llm_provider: str | None = typer.Option(
+        None, "--llm-provider", help="LLM provider to use (ollama, lm_studio, etc.)"
+    ),
+    llm_model: str | None = typer.Option(None, "--llm-model", help="LLM model to use"),
+    llm_config_path: Path | None = typer.Option(
+        None, "--llm-config", help="Path to LLM configuration file"
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
 ) -> None:
     """Automatically organize and improve knowledge base quality.
@@ -744,6 +759,9 @@ def organize(
         detect_duplicates=detect_duplicates,
         duplicate_threshold=duplicate_threshold,
         ai_suggest_metadata=ai_suggest_metadata,
+        llm_provider=llm_provider,
+        llm_model=llm_model,
+        llm_config_path=llm_config_path,
     )
 
 
@@ -752,6 +770,13 @@ def summarize(
     file_path: Path = typer.Argument(..., help="Path to markdown file to summarize"),
     max_length: int = typer.Option(
         200, "--max-length", help="Maximum length of summary in characters"
+    ),
+    llm_provider: str | None = typer.Option(
+        None, "--llm-provider", help="LLM provider to use (ollama, lm_studio, etc.)"
+    ),
+    llm_model: str | None = typer.Option(None, "--llm-model", help="LLM model to use"),
+    llm_config_path: Path | None = typer.Option(
+        None, "--llm-config", help="Path to LLM configuration file"
     ),
     output_file: Path | None = typer.Option(
         None, "--output", "-o", help="Output file to save the summary"
@@ -784,6 +809,9 @@ def summarize(
         max_length=max_length,
         output_file=output_file,
         verbose=verbose,
+        llm_provider=llm_provider,
+        llm_model=llm_model,
+        llm_config_path=llm_config_path,
     )
 
 
