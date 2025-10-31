@@ -1,5 +1,6 @@
 """Tests for organize command."""
 
+from typing import Any
 from unittest.mock import Mock, patch
 
 import click
@@ -16,11 +17,11 @@ from knowledge_base_organizer.infrastructure.config import ProcessingConfig
 class TestOrganizeCommand:
     """Test cases for organize command."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         self.runner = CliRunner()
 
-    def test_organize_command_basic_functionality(self, tmp_path):
+    def test_organize_command_basic_functionality(self, tmp_path: Any) -> None:
         """Test basic organize command functionality without AI."""
         # Create test vault structure
         vault_path = tmp_path / "test_vault"
@@ -74,7 +75,7 @@ Some content here.
             # Verify enhancement service was called
             mock_enhancement_service.enhance_vault_frontmatter.assert_called_once()
 
-    def test_organize_command_with_ai_suggestions(self, tmp_path):
+    def test_organize_command_with_ai_suggestions(self, tmp_path: Any) -> None:
         """Test organize command with AI metadata suggestions enabled."""
         # Create test vault structure
         vault_path = tmp_path / "test_vault"
@@ -131,8 +132,8 @@ It discusses various algorithms and techniques used in data science.
                 "knowledge_base_organizer.cli.organize_command.FrontmatterEnhancementService"
             ) as mock_enhancement_class,
             patch(
-                "knowledge_base_organizer.cli.organize_command.OllamaLLMService"
-            ) as mock_llm_class,
+                "knowledge_base_organizer.infrastructure.llm_factory.create_llm_service"
+            ) as mock_create_llm,
         ):
             # Setup mocks
             mock_file_repo = Mock()
@@ -142,7 +143,7 @@ It discusses various algorithms and techniques used in data science.
             mock_file_repo.load_vault.return_value = [mock_file]
             mock_file_repo_class.return_value = mock_file_repo
             mock_enhancement_class.return_value = mock_enhancement_service
-            mock_llm_class.return_value = mock_llm_service
+            mock_create_llm.return_value = mock_llm_service
 
             # Run the command with AI enabled
             organize_command(
@@ -153,13 +154,13 @@ It discusses various algorithms and techniques used in data science.
                 verbose=True,
             )
 
-            # Verify LLM service was initialized and set
-            mock_llm_class.assert_called_once()
+            # Verify LLM service was created and set
+            mock_create_llm.assert_called_once()
             mock_enhancement_service.set_llm_service.assert_called_once_with(
                 mock_llm_service
             )
 
-    def test_organize_command_ai_service_failure(self, tmp_path):
+    def test_organize_command_ai_service_failure(self, tmp_path: Any) -> None:
         """Test organize command when AI service fails to initialize."""
         # Create test vault structure
         vault_path = tmp_path / "test_vault"
@@ -180,8 +181,8 @@ It discusses various algorithms and techniques used in data science.
                 "knowledge_base_organizer.cli.organize_command.FrontmatterEnhancementService"
             ) as mock_enhancement_class,
             patch(
-                "knowledge_base_organizer.cli.organize_command.OllamaLLMService"
-            ) as mock_llm_class,
+                "knowledge_base_organizer.infrastructure.llm_factory.create_llm_service"
+            ) as mock_create_llm,
         ):
             # Setup mocks
             mock_file_repo = Mock()
@@ -193,7 +194,7 @@ It discusses various algorithms and techniques used in data science.
             mock_enhancement_class.return_value = mock_enhancement_service
 
             # Make LLM service initialization fail
-            mock_llm_class.side_effect = Exception("AI service unavailable")
+            mock_create_llm.side_effect = Exception("AI service unavailable")
 
             # Should not raise exception, just continue without AI
             organize_command(
@@ -209,7 +210,7 @@ It discusses various algorithms and techniques used in data science.
             # Verify set_llm_service was not called since AI failed
             mock_enhancement_service.set_llm_service.assert_not_called()
 
-    def test_organize_command_vault_not_exists(self, tmp_path):
+    def test_organize_command_vault_not_exists(self, tmp_path: Any) -> None:
         """Test error handling when vault path doesn't exist."""
         non_existent_vault = tmp_path / "nonexistent"
 
@@ -222,7 +223,7 @@ It discusses various algorithms and techniques used in data science.
                 verbose=False,
             )
 
-    def test_analyze_vault_improvements_with_llm_service(self, tmp_path):
+    def test_analyze_vault_improvements_with_llm_service(self, tmp_path: Any) -> None:
         """Test _analyze_vault_improvements function with LLM service."""
         vault_path = tmp_path / "test_vault"
         vault_path.mkdir()
@@ -265,7 +266,9 @@ It discusses various algorithms and techniques used in data science.
             # Verify results
             assert isinstance(results, list)
 
-    def test_analyze_vault_improvements_without_llm_service(self, tmp_path):
+    def test_analyze_vault_improvements_without_llm_service(
+        self, tmp_path: Any
+    ) -> None:
         """Test _analyze_vault_improvements function without LLM service."""
         vault_path = tmp_path / "test_vault"
         vault_path.mkdir()

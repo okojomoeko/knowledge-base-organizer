@@ -53,48 +53,45 @@ class LLMServiceFactory:
         if model_name:
             provider_config.model_name = model_name
 
-        # Override other settings if specified
-        for key, value in kwargs.items():
-            if hasattr(provider_config, key):
-                setattr(provider_config, key, value)
+        # Prepare service arguments
+        service_kwargs = {
+            "base_url": provider_config.base_url,
+            "model_name": provider_config.model_name,
+            "timeout": provider_config.timeout,
+            **provider_config.options,
+            **kwargs,  # Override with any provided kwargs
+        }
+
+        # Add API key for OpenAI-compatible services
+        if provider_config.api_key:
+            service_kwargs["api_key"] = provider_config.api_key
 
         # Create service based on API format
         api_format = provider_config.api_format.lower()
 
         if api_format == "ollama":
-            return self._create_ollama_service(provider_config)
+            return self._create_ollama_service(service_kwargs)
         if api_format == "openai":
-            return self._create_openai_compatible_service(provider_config)
+            return self._create_openai_compatible_service(service_kwargs)
         raise ValueError(f"Unsupported API format: {api_format}")
 
-    def _create_ollama_service(self, config: LLMProviderConfig) -> LLMService:
+    def _create_ollama_service(self, service_kwargs: dict) -> LLMService:
         """Create Ollama LLM service."""
         try:
             from .ollama_llm import OllamaLLMService
 
-            return OllamaLLMService(
-                base_url=config.base_url,
-                model_name=config.model_name,
-                timeout=config.timeout,
-                **config.options,
-            )
+            # Remove api_key if present (not needed for Ollama)
+            service_kwargs.pop("api_key", None)
+            return OllamaLLMService(**service_kwargs)
         except ImportError as e:
             raise ImportError(f"Ollama service dependencies not available: {e}") from e
 
-    def _create_openai_compatible_service(
-        self, config: LLMProviderConfig
-    ) -> LLMService:
+    def _create_openai_compatible_service(self, service_kwargs: dict) -> LLMService:
         """Create OpenAI-compatible LLM service."""
         try:
             from .openai_compatible_llm import OpenAICompatibleLLMService
 
-            return OpenAICompatibleLLMService(
-                base_url=config.base_url,
-                model_name=config.model_name,
-                api_key=config.api_key,
-                timeout=config.timeout,
-                **config.options,
-            )
+            return OpenAICompatibleLLMService(**service_kwargs)
         except ImportError as e:
             raise ImportError(
                 f"OpenAI-compatible service dependencies not available: {e}"
@@ -128,6 +125,31 @@ class LLMServiceFactory:
         except Exception as e:
             logger.error(f"Failed to connect to provider {provider_name}: {e}")
             return False
+
+    def get_provider_config(
+        self, provider_name: str | None = None
+    ) -> LLMProviderConfig:
+        """
+        Get provider configuration.
+
+        Args:
+            provider_name: Name of the provider. If None, uses default.
+
+        Returns:
+            Provider configuration
+
+        Raises:
+            ValueError: If provider is not configured
+        """
+        return self.config_manager.get_provider_config(provider_name)
+
+    def list_providers(self) -> list[str]:
+        """Get list of configured provider names."""
+        return self.config_manager.list_available_providers()
+
+    def get_default_provider(self) -> str:
+        """Get the default provider name."""
+        return self.config_manager.get_config().default_provider
 
 
 # Global factory instance

@@ -450,7 +450,11 @@ class OllamaLLMService(LLMService):
             SimilarityResult indicating context match quality
         """
         if not all(
-            [candidate_text.strip(), source_context.strip(), target_content.strip()]
+            [
+                candidate_text.strip(),
+                source_context.strip(),
+                target_content.strip(),
+            ]
         ):
             return SimilarityResult(
                 score=0.0,

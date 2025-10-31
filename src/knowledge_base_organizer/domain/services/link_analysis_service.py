@@ -1401,8 +1401,7 @@ class LinkAnalysisService:
                         "connection_type": "title_similarity",
                         "confidence": 0.8,
                         "reason": (
-                            f"Similar titles: '{orphaned_title}' and "
-                            f"'{candidate_title}'"
+                            f"Similar titles: '{orphaned_title}' and '{candidate_title}'"
                         ),
                     }
                 )

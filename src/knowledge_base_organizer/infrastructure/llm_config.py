@@ -139,7 +139,7 @@ class LLMConfigManager:
         for config_path in config_paths:
             if config_path.exists():
                 try:
-                    with open(config_path, encoding="utf-8") as f:
+                    with Path(config_path).open(encoding="utf-8") as f:
                         return yaml.safe_load(f) or {}
                 except Exception as e:
                     print(f"Warning: Failed to load config from {config_path}: {e}")
@@ -269,9 +269,7 @@ class LLMConfigManager:
             provider_name = config.default_provider
 
         if provider_name not in config.providers:
-            raise ValueError(
-                f"Provider '{provider_name}' not configured. Available providers: {list(config.providers.keys())}"
-            )
+            raise ValueError(f"Unknown provider: {provider_name}")
 
         return config.providers[provider_name]
 
@@ -338,7 +336,7 @@ class LLMConfigManager:
         }
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(output_path, "w", encoding="utf-8") as f:
+        with Path(output_path).open("w", encoding="utf-8") as f:
             yaml.dump(template_config, f, default_flow_style=False, allow_unicode=True)
 
         print(f"Created LLM configuration template at: {output_path}")

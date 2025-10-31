@@ -13,6 +13,7 @@ import re
 from typing import Any
 
 import requests
+from requests.exceptions import RequestException
 
 from knowledge_base_organizer.domain.services.ai_services import (
     ConceptExtractionResult,
@@ -91,7 +92,7 @@ class OpenAICompatibleLLMService(LLMService):
                 if available_models:
                     self.model_name = available_models[0]
 
-        except requests.exceptions.RequestException as e:
+        except RequestException as e:
             raise ModelNotAvailableError(
                 f"OpenAI-compatible service not available at {self.base_url}: {e}"
             ) from e
@@ -158,7 +159,7 @@ class OpenAICompatibleLLMService(LLMService):
 
             return generated_text
 
-        except requests.exceptions.RequestException as e:
+        except RequestException as e:
             raise LLMError(f"Failed to generate completion: {e}") from e
         except (KeyError, json.JSONDecodeError) as e:
             raise LLMError(f"Invalid response from API: {e}") from e
@@ -386,9 +387,15 @@ class OpenAICompatibleLLMService(LLMService):
             response = self._generate_completion(prompt, system_prompt)
 
             # Parse the structured response
-            relationship_type = (
+            relationship_type_raw = (
                 self._extract_section(response, "RELATIONSHIP", single_value=True)
                 or "UNRELATED"
+            )
+            # Extract just the relationship type (first word)
+            relationship_type = (
+                relationship_type_raw.split()[0]
+                if relationship_type_raw
+                else "UNRELATED"
             )
             confidence_str = (
                 self._extract_section(response, "CONFIDENCE", single_value=True)
@@ -441,7 +448,11 @@ class OpenAICompatibleLLMService(LLMService):
             SimilarityResult indicating context match quality
         """
         if not all(
-            [candidate_text.strip(), source_context.strip(), target_content.strip()]
+            [
+                candidate_text.strip(),
+                source_context.strip(),
+                target_content.strip(),
+            ]
         ):
             return SimilarityResult(
                 score=0.0,
@@ -559,18 +570,21 @@ class OpenAICompatibleLLMService(LLMService):
         try:
             response = self._generate_completion(prompt, system_prompt)
 
-            # Parse rankings
+            # Parse rankings using regex to extract scores
             rankings = []
             for i, (target_id, _) in enumerate(target_options):
                 target_key = f"TARGET_{i + 1}"
-                score_str = self._extract_section(
-                    response, target_key, single_value=True
-                )
+                # Look for pattern like "TARGET_1: 0.9"
+                pattern = rf"{target_key}:\s*([0-9.]+)"
+                match = re.search(pattern, response)
 
-                try:
-                    score = float(score_str) if score_str else 0.0
-                    score = max(0.0, min(1.0, score))
-                except ValueError:
+                if match:
+                    try:
+                        score = float(match.group(1))
+                        score = max(0.0, min(1.0, score))
+                    except ValueError:
+                        score = 0.0
+                else:
                     score = 0.0
 
                 rankings.append((target_id, score))
@@ -630,7 +644,7 @@ class OpenAICompatibleLLMService(LLMService):
                     "timeout": self.timeout,
                 }
 
-            except requests.exceptions.RequestException as e:
+            except RequestException as e:
                 logger.warning(f"Could not retrieve model info: {e}")
                 self._model_info = {
                     "model_name": self.model_name,
@@ -656,8 +670,14 @@ class OpenAICompatibleLLMService(LLMService):
         Returns:
             Extracted section content as list or string
         """
-        pattern = rf"{section_name}:\s*(.+?)(?=\n[A-Z_]+:|$)"
-        match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+        # Look for the section with proper boundary detection
+        pattern = rf"{section_name}:\s*([^A-Z_\n]+?)(?=\s+[A-Z_]+\s*:|$)"
+        match = re.search(pattern, text, re.IGNORECASE)
+
+        # If not found, try simpler pattern
+        if not match:
+            pattern = rf"{section_name}:\s*(.+?)(?=\s+[A-Z_]+:|$)"
+            match = re.search(pattern, text, re.IGNORECASE)
 
         if not match:
             return None if single_value else []
@@ -686,7 +706,7 @@ class OpenAICompatibleLLMService(LLMService):
 
         # Boost if concept appears in content
         if concept.lower() in content.lower():
-            confidence += 0.3
+            confidence += 0.1
 
         # Boost for longer, more specific concepts
         if len(concept) > 10:

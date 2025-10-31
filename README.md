@@ -531,6 +531,297 @@ export LLM_PROVIDER="lm_studio"
 export LLM_CONFIG_PATH="/path/to/custom/llm_config.yaml"
 ```
 
+### 外部からのLLM設定注入
+
+knowledge-base-organizerは、外部システムからLLM設定を動的に注入することができます。これにより、CI/CD環境や自動化システムから柔軟にLLM設定を管理できます。
+
+#### 設定注入の方法
+
+**1. 環境変数による注入**
+
+```bash
+# 基本設定
+export LLM_PROVIDER="custom_api"
+export LLM_BASE_URL="https://api.example.com"
+export LLM_MODEL="gpt-4"
+export LLM_API_KEY="your-api-key"
+
+# 高度な設定
+export LLM_TIMEOUT="180"
+export LLM_TEMPERATURE="0.7"
+export LLM_MAX_TOKENS="4096"
+
+# AI機能を実行
+uv run python -m knowledge_base_organizer organize /path/to/vault --ai-suggest-metadata --execute
+```
+
+**2. 設定ファイルによる注入**
+
+```bash
+# カスタム設定ファイルを作成
+cat > custom_llm_config.yaml << EOF
+default_provider: "production_api"
+
+providers:
+  production_api:
+    base_url: "https://your-production-api.com"
+    model_name: "production-model-v2"
+    api_format: "openai"
+    api_key: "${PRODUCTION_API_KEY}"
+    timeout: 300
+    options:
+      temperature: 0.3
+      max_tokens: 8192
+      top_p: 0.9
+
+  development_api:
+    base_url: "http://localhost:8080"
+    model_name: "dev-model"
+    api_format: "openai"
+    timeout: 60
+    options:
+      temperature: 0.8
+EOF
+
+# 設定ファイルを指定して実行
+uv run python -m knowledge_base_organizer organize /path/to/vault \
+  --ai-suggest-metadata --llm-config custom_llm_config.yaml --execute
+```
+
+**3. コマンドライン引数による注入**
+
+```bash
+# プロバイダーとモデルを直接指定
+uv run python -m knowledge_base_organizer organize /path/to/vault \
+  --ai-suggest-metadata \
+  --llm-provider custom_api \
+  --llm-model gpt-4-turbo \
+  --execute
+
+# 要約生成で特定のモデルを使用
+uv run python -m knowledge_base_organizer summarize /path/to/note.md \
+  --llm-provider ollama \
+  --llm-model qwen2.5:32b \
+  --max-length 500
+```
+
+#### CI/CD統合例
+
+**GitHub Actions**
+
+```yaml
+name: Knowledge Base AI Enhancement
+on:
+  schedule:
+    - cron: '0 2 * * 1'  # 毎週月曜日2時
+
+jobs:
+  ai-enhance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v1
+
+      - name: Setup LLM Configuration
+        env:
+          LLM_PROVIDER: "openai_compatible"
+          LLM_BASE_URL: ${{ secrets.LLM_API_URL }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL: "gpt-4"
+        run: |
+          uv sync
+
+          # AI強化処理を実行
+          uv run python -m knowledge_base_organizer organize vault/ \
+            --ai-suggest-metadata --execute --backup \
+            --output-format json > enhancement-report.json
+
+      - name: Commit AI enhancements
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git commit -m "AI-enhanced metadata updates" || exit 0
+          git push
+```
+
+**Docker環境**
+
+```dockerfile
+# Dockerfile
+FROM python:3.13-slim
+
+# Install uv
+RUN pip install uv
+
+# Copy application
+COPY . /app
+WORKDIR /app
+
+# Install dependencies
+RUN uv sync
+
+# Set default LLM configuration
+ENV LLM_PROVIDER="ollama"
+ENV LLM_BASE_URL="http://ollama:11434"
+ENV LLM_MODEL="qwen2.5:7b"
+
+# Entry point
+ENTRYPOINT ["uv", "run", "python", "-m", "knowledge_base_organizer"]
+```
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  knowledge-base-organizer:
+    build: .
+    environment:
+      - LLM_PROVIDER=ollama
+      - LLM_BASE_URL=http://ollama:11434
+      - LLM_MODEL=qwen2.5:7b
+    volumes:
+      - ./vault:/vault
+    command: ["organize", "/vault", "--ai-suggest-metadata", "--execute"]
+    depends_on:
+      - ollama
+
+  ollama:
+    image: ollama/ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+volumes:
+  ollama_data:
+```
+
+#### API統合例
+
+**REST API経由での設定注入**
+
+```python
+# api_integration.py
+import requests
+import subprocess
+import json
+
+def enhance_knowledge_base_with_api_config():
+    # 外部APIから設定を取得
+    config_response = requests.get("https://config-api.example.com/llm-config")
+    llm_config = config_response.json()
+
+    # 設定ファイルを生成
+    with open("runtime_llm_config.yaml", "w") as f:
+        yaml.dump(llm_config, f)
+
+    # knowledge-base-organizerを実行
+    result = subprocess.run([
+        "uv", "run", "python", "-m", "knowledge_base_organizer",
+        "organize", "/path/to/vault",
+        "--ai-suggest-metadata",
+        "--llm-config", "runtime_llm_config.yaml",
+        "--execute",
+        "--output-format", "json"
+    ], capture_output=True, text=True)
+
+    # 結果を処理
+    if result.returncode == 0:
+        enhancement_report = json.loads(result.stdout)
+        return enhancement_report
+    else:
+        raise Exception(f"Enhancement failed: {result.stderr}")
+
+# 使用例
+try:
+    report = enhance_knowledge_base_with_api_config()
+    print(f"Enhanced {report['files_processed']} files")
+except Exception as e:
+    print(f"Error: {e}")
+```
+
+#### セキュリティ考慮事項
+
+**API キーの管理**
+
+```bash
+# 環境変数ファイルを使用（.env）
+echo "LLM_API_KEY=your-secret-key" > .env
+echo "LLM_BASE_URL=https://secure-api.example.com" >> .env
+
+# .envファイルを読み込んで実行
+set -a && source .env && set +a
+uv run python -m knowledge_base_organizer organize vault/ --ai-suggest-metadata --execute
+```
+
+**設定の検証**
+
+```bash
+# 設定の妥当性を事前確認
+uv run python -m knowledge_base_organizer llm test-connection --verbose
+
+# 設定内容を確認（API キーは隠される）
+uv run python -m knowledge_base_organizer llm show-config
+```
+
+#### トラブルシューティング
+
+**設定注入の問題**
+
+```bash
+# 現在の設定を確認
+uv run python -m knowledge_base_organizer llm show-config
+
+# 利用可能なプロバイダーを確認
+uv run python -m knowledge_base_organizer llm list-providers
+
+# 接続テスト
+uv run python -m knowledge_base_organizer llm test-connection --provider custom_api --verbose
+
+# 設定ファイルの妥当性チェック
+uv run python -c "
+import yaml
+with open('custom_llm_config.yaml') as f:
+    config = yaml.safe_load(f)
+    print('Configuration is valid YAML')
+    print(f'Providers: {list(config.get(\"providers\", {}).keys())}')
+"
+```
+
+**よくある問題と解決方法**
+
+1. **環境変数が反映されない**
+
+   ```bash
+   # 環境変数の確認
+   env | grep LLM
+
+   # 明示的に設定
+   export LLM_PROVIDER="your_provider"
+   ```
+
+2. **API接続エラー**
+
+   ```bash
+   # ネットワーク接続確認
+   curl -I "$LLM_BASE_URL/v1/models"
+
+   # タイムアウト設定を調整
+   export LLM_TIMEOUT="300"
+   ```
+
+3. **設定ファイルが見つからない**
+
+   ```bash
+   # 絶対パスで指定
+   uv run python -m knowledge_base_organizer organize vault/ \
+     --llm-config /absolute/path/to/llm_config.yaml \
+     --ai-suggest-metadata --execute
+   ```
+
+この柔軟な設定注入システムにより、様々な環境やワークフローでknowledge-base-organizerのAI機能を活用できます。
+
 ### AI機能の制限事項
 
 #### 現在の制限

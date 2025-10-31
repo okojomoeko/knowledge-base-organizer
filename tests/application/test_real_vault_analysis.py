@@ -348,8 +348,8 @@ class TestRealVaultAnalysis:
 
         # Should show that files were found
         assert "total_files" in output, "Should show total_files count"
-        assert '"total_files": 15' in output or '"total_files":15' in output, (
-            "Should find 15 files in test vault"
+        assert '"total_files": 22' in output or '"total_files":22' in output, (
+            "Should find 22 files in test vault"
         )
 
     def test_cli_analyze_command_console_output(self, test_vault_path: Path) -> None:

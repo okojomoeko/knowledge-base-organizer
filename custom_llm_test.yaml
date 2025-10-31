@@ -1,0 +1,21 @@
+default_provider: "lm_studio"
+
+providers:
+  lm_studio:
+    base_url: "http://localhost:1234"
+    model_name: "qwen/qwen3-1.7b"
+    timeout: 60
+    api_format: "openai"
+    options:
+      temperature: 0.5
+      max_tokens: 1024
+
+metadata_suggestion:
+  max_tags: 3
+  max_aliases: 2
+  description_max_length: 100
+
+summarization:
+  default_max_length: 150
+  min_length: 30
+  preserve_structure: true

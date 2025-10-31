@@ -9,7 +9,7 @@ providers:
   # Ollama Configuration (Local LLM)
   ollama:
     base_url: "http://localhost:11434"
-    model_name: "qwen2.5:7b"  # Recommended model for Japanese support
+    model_name: "qwen2.5:7b" # Recommended model for Japanese support
     timeout: 120
     options:
       temperature: 0.3
@@ -19,17 +19,17 @@ providers:
 
     # Alternative models you can use
     alternative_models:
-      - "llama3.1:8b"      # Good general model
-      - "qwen2.5:14b"      # Higher quality, requires more resources
-      - "llama3.2:3b"      # Lighter model for faster responses
-      - "codellama:7b"     # Specialized for code analysis
+      - "llama3.1:8b" # Good general model
+      - "qwen2.5:14b" # Higher quality, requires more resources
+      - "llama3.2:3b" # Lighter model for faster responses
+      - "codellama:7b" # Specialized for code analysis
 
   # LM Studio Configuration (Local LLM with different interface)
   lm_studio:
-    base_url: "http://localhost:1234"  # Default LM Studio port
-    model_name: "local-model"  # LM Studio uses generic model name
+    base_url: "http://localhost:1234" # Default LM Studio port
+    model_name: "qwen/qwen3-1.7b" # Use lighter model
     timeout: 120
-    api_format: "openai"  # LM Studio uses OpenAI-compatible API
+    api_format: "openai" # LM Studio uses OpenAI-compatible API
     options:
       temperature: 0.3
       max_tokens: 2048
@@ -37,9 +37,9 @@ providers:
 
   # OpenAI-compatible API Configuration
   openai_compatible:
-    base_url: "http://localhost:8000"  # Custom endpoint
+    base_url: "http://localhost:8000" # Custom endpoint
     model_name: "custom-model"
-    api_key: ""  # Set via environment variable OPENAI_API_KEY
+    api_key: "" # Set via environment variable OPENAI_API_KEY
     timeout: 120
     api_format: "openai"
     options:
@@ -51,46 +51,47 @@ providers:
 model_settings:
   # Japanese-optimized settings
   japanese_models:
-    - "qwen2.5:7b"
-    - "qwen2.5:14b"
+    models:
+      - "qwen2.5:7b"
+      - "qwen2.5:14b"
     system_prompt_suffix: "日本語での回答も可能です。"
 
   # Code-specialized models
   code_models:
-    - "codellama:7b"
-    - "deepseek-coder:6.7b"
+    models:
+      - "codellama:7b"
+      - "deepseek-coder:6.7b"
     system_prompt_suffix: "Focus on technical accuracy and code-related concepts."
 
 # Feature-specific configurations
-features:
-  metadata_suggestion:
-    max_tags: 5
-    max_aliases: 3
-    description_max_length: 200
+metadata_suggestion:
+  max_tags: 5
+  max_aliases: 3
+  description_max_length: 200
 
-  summarization:
-    default_max_length: 200
-    min_length: 50
-    preserve_structure: true
+summarization:
+  default_max_length: 200
+  min_length: 50
+  preserve_structure: true
 
-  concept_extraction:
-    max_concepts: 5
-    min_confidence: 0.6
+concept_extraction:
+  max_concepts: 5
+  min_confidence: 0.6
 
-  relationship_analysis:
-    confidence_threshold: 0.7
-    max_relationships: 10
+relationship_analysis:
+  confidence_threshold: 0.7
+  max_relationships: 10
 
 # Performance and reliability settings
 performance:
   retry_attempts: 3
-  retry_delay: 1.0  # seconds
+  retry_delay: 1.0 # seconds
   connection_timeout: 30
   read_timeout: 120
 
   # Fallback behavior
   fallback_on_error: true
-  fallback_provider: "ollama"  # Fallback to Ollama if primary fails
+  fallback_provider: "ollama" # Fallback to Ollama if primary fails
 
 # Logging and debugging
 logging:

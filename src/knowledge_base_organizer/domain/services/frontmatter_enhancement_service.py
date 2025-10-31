@@ -713,8 +713,16 @@ class FrontmatterEnhancementService:
             # 4.1. Apply AI-powered metadata suggestions (Requirement 17.1, 23.1)
             if self.llm_service:
                 try:
+                    # Convert frontmatter to JSON-serializable format for AI
+                    serializable_frontmatter = {}
+                    for key, value in enhanced_frontmatter.items():
+                        if hasattr(value, "isoformat"):  # datetime/date objects
+                            serializable_frontmatter[key] = value.isoformat()
+                        else:
+                            serializable_frontmatter[key] = value
+
                     ai_suggestions = self.llm_service.suggest_metadata(
-                        file.content, enhanced_frontmatter
+                        file.content, serializable_frontmatter
                     )
 
                     # Apply AI-suggested tags
