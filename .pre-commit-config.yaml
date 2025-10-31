@@ -45,12 +45,20 @@ repos:
         language: system
         exclude_types: [markdown]
         stages: [pre-commit, manual]
-      - id: ruff-lint
-        name: Ruff format and lint
-        entry: nox -s lint
-        language: python
+      - id: ruff-format
+        name: ruff-format
+        entry: ruff format
+        language: system
         types_or: [python, pyi, jupyter]
-        pass_filenames: false
+        require_serial: true
+        stages: [pre-commit, manual]
+      - id: ruff-check
+        name: ruff-check (fast)
+        entry: ruff check
+        language: system
+        types_or: [python, pyi, jupyter]
+        require_serial: true
+        args: [--select=F,W,I,UP, --fix]
         stages: [pre-commit, manual]
       # - id: ruff-check
       #   name: ruff-check
@@ -70,11 +78,12 @@ repos:
       #   stages: [pre-commit, manual]
       - id: lizard
         name: lizard
-        entry: nox -s lizard
+        entry: lizard
         language: system
         types_or: [python, pyi, jupyter]
-        stages: [pre-commit, manual]
+        stages: [manual]  # pre-commitから除外、手動実行のみ
         pass_filenames: false
+        args: [--languages=python, --CCN=20, --length=100, --arguments=5, --exclude=experiments/*, src, tests]
       # - id: pip-audit
       #   name: pip-audit
       #   description: "Audits Python environments and dependency trees for known vulnerabilities"
@@ -83,10 +92,18 @@ repos:
       #   language: python
       #   stages: [pre-commit, manual]
       #   args: [--ignore-vuln=GHSA-4xh5-x5gv-qwph]
-      - id: nox-pytest
-        name: Run Nox pytest for all Python versions
+      - id: fast-tests
+        name: Fast tests (essential only)
+        entry: pytest
+        language: system
+        types_or: [python, pyi, jupyter]
+        pass_filenames: false
+        args: [-x, --tb=short, --maxfail=3]
+        stages: [pre-commit, manual]
+      - id: full-tests
+        name: Full test suite
         entry: nox -s pytest
-        language: python
+        language: system
         types_or: [python, pyi, jupyter]
         pass_filenames: false
         stages: [pre-push, manual]

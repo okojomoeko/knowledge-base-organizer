@@ -124,7 +124,7 @@ class TextRange(BaseModel):
     start_column: int
     end_line: int
     end_column: int
-    zone_type: str  # "frontmatter", "wikilink", "regular_link", "link_ref_def", "table", "template_variable"  # noqa: E501
+    zone_type: str  # "frontmatter", "wikilink", "regular_link", "link_ref_def", "table", "template_variable"
 
 
 class WikiLink(BaseModel):

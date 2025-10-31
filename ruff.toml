@@ -2,20 +2,31 @@ line-length = 88
 target-version = "py313"
 
 [lint]
-select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "PIE", "PT", "Q", "RET", "SIM", "ARG", "PTH", "PL", "RUF"]
+# pyproject.tomlと統一: 必須ルールのみ
+select = ["E", "F", "W", "I", "UP", "B", "C4", "PIE", "PT", "RET", "SIM", "ARG", "PTH", "RUF"]
 
-# Ignore specific rules that are too strict for our use case
+# より寛容な設定
 ignore = [
     "B008",    # Do not perform function calls in argument defaults (typer pattern)
-    "FBT001",  # Boolean typed positional argument
-    "FBT003",  # Boolean positional value in function call
     "ARG001",  # Unused function argument (CLI placeholders)
-    "PLR0913", # Too many arguments (CLI commands)
-    "PLR6301", # Method could be static (pytest methods need self)
-    "PLR2004", # Magic value used in comparison (test constants)
+    "RET504",  # Unnecessary assignment before return
+    "SIM108",  # Use ternary operator (readability preference)
+    "PTH123",  # Path.open() instead of open() (compatibility)
+    "E501",    # Line too long (handled by formatter)
+    "F841",    # Local variable assigned but never used
+    "B017",    # pytest.raises(Exception) is acceptable
 ]
 
 [lint.per-file-ignores]
 "tests/**/*.py" = [
-    "S101",    # Use of assert detected (pytest uses asserts)
+    "ARG001",  # Unused function argument (fixtures)
+    "PTH",     # Path rules (test files can use string paths)
+    "F841",    # Unused variables in tests
+    "B017",    # pytest.raises(Exception) is acceptable
+    "E501",    # Long lines in test data
+]
+"experiments/**/*.py" = [
+    "T201",    # print() allowed in experiments
+    "E501",    # Long lines allowed in experiments
+    "F841",    # Unused variables allowed in experiments
 ]

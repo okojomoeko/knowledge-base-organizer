@@ -97,7 +97,6 @@ class TestLLMServiceFactory:
             base_url="http://localhost:1234",
             model_name="local-model",
             timeout=60,
-            api_key=None,
             temperature=0.5,
             max_tokens=2048,
         )
@@ -261,7 +260,12 @@ class TestCreateLLMServiceFunction:
                     model_name="qwen2.5:7b",
                     timeout=120,
                     api_format="ollama",
-                    options={"temperature": 0.3},
+                    options={
+                        "temperature": 0.3,
+                        "top_p": 0.9,
+                        "top_k": 40,
+                        "num_predict": 2048,
+                    },
                 )
             },
         )
@@ -282,6 +286,9 @@ class TestCreateLLMServiceFunction:
                 model_name="qwen2.5:7b",
                 timeout=120,
                 temperature=0.3,
+                top_p=0.9,
+                top_k=40,
+                num_predict=2048,
             )
 
     @patch("knowledge_base_organizer.infrastructure.llm_config.get_llm_config")
@@ -298,7 +305,12 @@ class TestCreateLLMServiceFunction:
                     model_name="qwen2.5:7b",
                     timeout=120,
                     api_format="ollama",
-                    options={"temperature": 0.3},
+                    options={
+                        "temperature": 0.3,
+                        "top_p": 0.9,
+                        "top_k": 40,
+                        "num_predict": 2048,
+                    },
                 )
             },
         )
@@ -319,6 +331,10 @@ class TestCreateLLMServiceFunction:
                 model_name="custom-model",  # Overridden
                 timeout=120,
                 temperature=0.3,
+                top_p=0.9,
+                top_k=40,
+                num_predict=2048,
+                provider="ollama",
             )
 
 

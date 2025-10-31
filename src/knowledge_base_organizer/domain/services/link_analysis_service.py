@@ -695,8 +695,8 @@ class LinkAnalysisService:
     def _determine_best_alias_with_japanese(
         self,
         matched_text: str,
-        target_file: MarkdownFile,  # noqa: ARG002
-        target_info: dict[str, Any],  # noqa: ARG002
+        target_file: MarkdownFile,
+        target_info: dict[str, Any],
     ) -> str | None:
         """Determine the best alias to use for a WikiLink with Japanese variations.
 
@@ -1060,7 +1060,7 @@ class LinkAnalysisService:
         self,
         orphaned_file: MarkdownFile,
         all_files: list[MarkdownFile],
-        file_registry: dict[str, MarkdownFile],  # noqa: ARG002
+        file_registry: dict[str, MarkdownFile],
         link_graph: dict[str, dict[str, list[str]]],
     ) -> list[ConnectionSuggestion]:
         """Suggest connections for an orphaned note.

@@ -135,7 +135,7 @@ class FrontmatterValidationService:
     def _validate_cross_field_consistency(
         self,
         frontmatter_dict: dict[str, Any],
-        schema: FrontmatterSchema,  # noqa: ARG002
+        schema: FrontmatterSchema,
     ) -> list[str]:
         """Validate consistency between related fields."""
         warnings = []
@@ -264,7 +264,7 @@ class FrontmatterValidationService:
     def _generate_value_improvement_fixes(
         self,
         frontmatter_dict: dict[str, Any],
-        schema: FrontmatterSchema,  # noqa: ARG002
+        schema: FrontmatterSchema,
     ) -> list[FieldFix]:
         """Generate fixes for value improvements."""
         fixes = []
@@ -444,7 +444,7 @@ class FrontmatterValidationService:
     def _fix_pattern_violation(
         self,
         value: str,
-        pattern: str,  # noqa: ARG002
+        pattern: str,
         field_name: str,
     ) -> str | None:
         """Attempt to fix pattern violations."""

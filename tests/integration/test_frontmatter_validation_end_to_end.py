@@ -71,7 +71,7 @@ class TestFrontmatterValidationEndToEnd:
     def test_template_schema_extraction_from_real_vault(
         self,
         validation_components: dict[str, Any],
-        temp_vault_copy: Path,  # noqa: ARG002
+        temp_vault_copy: Path,
     ):
         """Test template schema extraction from real vault templates."""
         template_repo = validation_components["template_schema_repository"]
@@ -88,7 +88,7 @@ class TestFrontmatterValidationEndToEnd:
         assert "id" in fleeting_schema.fields
         assert "published" in fleeting_schema.fields or "date" in fleeting_schema.fields
 
-        # Note: Book template may not be parsed due to YAML issues with template variables  # noqa: E501
+        # Note: Book template may not be parsed due to YAML issues with template variables
         # This is expected behavior - templates with invalid YAML should be skipped
         if "booksearchtemplate" in schemas:
             book_schema = schemas["booksearchtemplate"]
@@ -231,7 +231,7 @@ class TestFrontmatterValidationEndToEnd:
 
             # Verify fix suggestions are reasonable
             for field_name, suggested_value in suggested_fixes.items():
-                # Safety checks - allow ID suggestions for missing IDs, but be careful  # noqa: E501
+                # Safety checks - allow ID suggestions for missing IDs, but be careful
                 if field_name == "title":
                     # Only allow title suggestions for files that truly have no title
                     assert result_with_fixes.file_path.name in [
@@ -258,7 +258,7 @@ class TestFrontmatterValidationEndToEnd:
                 elif (
                     field_name in ["date", "published"] and suggested_value is not None
                 ):
-                    # Date fields can be suggested as string or None (for missing fields)  # noqa: E501
+                    # Date fields can be suggested as string or None (for missing fields)
                     assert isinstance(suggested_value, (str, type(None))), (
                         "Date fields should be suggested as string or None"
                     )
@@ -270,9 +270,9 @@ class TestFrontmatterValidationEndToEnd:
                             "Date should be in YYYY-MM-DD format"
                         )
 
-                # Should not suggest empty values for required fields (None is acceptable)  # noqa: E501
+                # Should not suggest empty values for required fields (None is acceptable)
                 if field_name in result_with_fixes.missing_fields:
-                    # Allow None for certain fields like published/date that need input  # noqa: E501
+                    # Allow None for certain fields like published/date that need input
                     if field_name not in ["published", "date"]:
                         assert suggested_value is not None, (
                             f"Should not suggest None for missing field: {field_name}"

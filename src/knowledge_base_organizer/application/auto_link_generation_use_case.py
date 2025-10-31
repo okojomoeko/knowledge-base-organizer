@@ -426,7 +426,7 @@ class AutoLinkGenerationUseCase:
             "candidates_skipped": total_skipped,
             "errors_encountered": len(errors),
             "success_rate": (
-                f"{((len(files_processed) - len(errors)) / len(files_processed) * 100):.1f}%"  # noqa: E501
+                f"{((len(files_processed) - len(errors)) / len(files_processed) * 100):.1f}%"
                 if files_processed
                 else "0%"
             ),
@@ -475,7 +475,7 @@ class AutoLinkGenerationUseCase:
         self,
         source_file: MarkdownFile,
         file_registry: dict[str, MarkdownFile],
-        exclusion_zones: list[TextRange],  # noqa: ARG002
+        exclusion_zones: list[TextRange],
         threshold: float,
         max_candidates: int,
     ) -> list:

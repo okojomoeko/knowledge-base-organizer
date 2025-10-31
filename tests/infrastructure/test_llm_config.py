@@ -205,7 +205,7 @@ class TestLLMConfigManager:
         """Test getting configuration for invalid provider."""
         manager = LLMConfigManager(self.config_file)
 
-        with pytest.raises(ValueError, match="Provider 'invalid' not configured"):
+        with pytest.raises(ValueError, match="Unknown provider: invalid"):
             manager.get_provider_config("invalid")
 
     def test_list_available_providers(self):

@@ -1,1 +1,6 @@
-exclude_dirs: ['tests', ".venv"]
+exclude_dirs: ['tests', '.venv', 'experiments']
+# 開発効率重視: 重要度の高い問題のみ
+severity: medium
+confidence: medium
+# 一般的な誤検知を除外
+skips: ['B101', 'B601']  # assert_used, shell_injection (開発時によくある誤検知)

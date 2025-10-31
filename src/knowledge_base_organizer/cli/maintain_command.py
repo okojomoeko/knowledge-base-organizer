@@ -25,7 +25,7 @@ from ..infrastructure.file_repository import FileRepository
 console = Console()
 
 
-def maintain_command(  # noqa: PLR0912, PLR0915
+def maintain_command(
     vault_path: Path,
     dry_run: bool = True,
     interactive: bool = False,

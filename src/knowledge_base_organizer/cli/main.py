@@ -1477,7 +1477,7 @@ def _output_auto_link_results(
         _display_auto_link_console(result, console, verbose)
 
 
-def _display_auto_link_console(result, console: Console, verbose: bool) -> None:  # noqa: PLR0912
+def _display_auto_link_console(result, console: Console, verbose: bool) -> None:
     """Display auto-link generation results in console format."""
     console.print("\n[bold blue]🔗 Auto-Link Generation Results[/bold blue]")
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

@@ -3,6 +3,7 @@
 from typing import Any
 from unittest.mock import Mock, patch
 
+import click
 import pytest
 from typer.testing import CliRunner
 
@@ -77,7 +78,7 @@ Machine learning is used in various fields including:
             summarize_command(
                 file_path=test_file,
                 max_length=200,
-                output=None,
+                output_file=None,
                 verbose=False,
             )
 
@@ -128,7 +129,7 @@ Machine learning is used in various fields including:
             summarize_command(
                 file_path=test_file,
                 max_length=100,
-                output=output_file,
+                output_file=output_file,
                 verbose=True,
             )
 
@@ -161,11 +162,11 @@ Machine learning is used in various fields including:
             mock_create_llm.side_effect = Exception("LLM service unavailable")
 
             # Should handle the error gracefully
-            with pytest.raises(SystemExit):
+            with pytest.raises(click.exceptions.Exit):
                 summarize_command(
                     file_path=test_file,
                     max_length=200,
-                    output=None,
+                    output_file=None,
                     verbose=False,
                 )
 
@@ -193,11 +194,11 @@ Machine learning is used in various fields including:
             mock_file_repo_class.return_value = mock_file_repo
 
             # Should handle the error gracefully
-            with pytest.raises(SystemExit):
+            with pytest.raises(click.exceptions.Exit):
                 summarize_command(
                     file_path=test_file,
                     max_length=200,
-                    output=None,
+                    output_file=None,
                     verbose=False,
                 )
 
@@ -236,11 +237,11 @@ Machine learning is used in various fields including:
             mock_file_repo_class.return_value = mock_file_repo
 
             # Should handle the error gracefully
-            with pytest.raises(SystemExit):
+            with pytest.raises(click.exceptions.Exit):
                 summarize_command(
                     file_path=test_file,
                     max_length=200,
-                    output=None,
+                    output_file=None,
                     verbose=False,
                 )
 
@@ -280,7 +281,7 @@ Machine learning is used in various fields including:
             summarize_command(
                 file_path=test_file,
                 max_length=200,
-                output=None,
+                output_file=None,
                 verbose=False,
             )
 

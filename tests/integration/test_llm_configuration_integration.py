@@ -55,7 +55,7 @@ class TestLLMConfigurationIntegration:
 
         # Test configuration loading
         config_manager = LLMConfigManager(self.config_file)
-        config = config_manager.get_config()
+        config = config_manager.load_config()
 
         assert config.default_provider == "ollama"
         assert "ollama" in config.providers
@@ -112,7 +112,7 @@ class TestLLMConfigurationIntegration:
 
         # Test configuration loading
         config_manager = LLMConfigManager(self.config_file)
-        config = config_manager.get_config()
+        config = config_manager.load_config()
 
         assert config.default_provider == "lm_studio"
         assert "lm_studio" in config.providers
@@ -238,7 +238,7 @@ class TestLLMConfigurationIntegration:
         try:
             # Test configuration with environment override
             config_manager = LLMConfigManager(self.config_file)
-            config = config_manager.get_config()
+            config = config_manager.load_config()
 
             # Environment variables should override config file values
             assert config.providers["ollama"].base_url == "http://custom-host:11434"
@@ -311,7 +311,7 @@ class TestLLMConfigurationIntegration:
 
         # Test configuration loading
         config_manager = LLMConfigManager(self.config_file)
-        config = config_manager.get_config()
+        config = config_manager.load_config()
 
         # Verify feature configuration is loaded correctly
         assert config.metadata_suggestion.max_tags == 5  # Default value, not overridden
@@ -411,7 +411,7 @@ class TestLLMConfigurationIntegration:
 
         # Should load successfully with defaults
         config_manager = LLMConfigManager(self.config_file)
-        config = config_manager.get_config()
+        config = config_manager.load_config()
 
         assert config.providers["ollama"].timeout == 120  # Default value
         assert config.providers["ollama"].options == {}  # Default empty options

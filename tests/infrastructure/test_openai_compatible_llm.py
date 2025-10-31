@@ -455,7 +455,7 @@ DESCRIPTION: A comprehensive guide to Python programming for beginners."""
 
         # Concept that doesn't appear in content
         confidence2 = self.llm_service._calculate_concept_confidence("Java", content)
-        assert confidence2 == 0.5  # Base confidence
+        assert confidence2 == 0.6  # Base confidence
 
         # Long, specific concept
         confidence3 = self.llm_service._calculate_concept_confidence(

@@ -149,7 +149,7 @@ class LLMServiceFactory:
 
     def get_default_provider(self) -> str:
         """Get the default provider name."""
-        return self.config_manager.get_config().default_provider
+        return self.config_manager.load_config().default_provider
 
 
 # Global factory instance
